@@ -204,6 +204,27 @@ const moduleGraph = await createModuleGraph('./index.js', {
 });
 ```
 
+#### `transformSource`
+
+> Runs for every file
+
+Can be used to extract JS from non-js files, like Vue or Svelte files.
+
+```js
+const plugin = {
+  name: 'my-plugin',
+  transformSource: ({ source }) => {
+    const match = source.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+    const result = match ? match[1].trim() : null;
+    return result;
+  }
+}
+
+const moduleGraph = await createModuleGraph('./App.html', {
+  plugins: [plugin]
+});
+```
+
 #### `handleImport`
 
 > Runs for every import starting (but excluding) the entrypoints

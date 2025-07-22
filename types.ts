@@ -41,6 +41,14 @@ export interface Plugin {
     exportConditions: string[],
   }) => void | Promise<void>;
   /**
+   * Runs for every file, can be used to transform source files,
+   * like for example supporting/extracting JS from html files for
+   * example Vue or Svelte components
+   */
+  transformSource?: (params: {
+    source: string
+  }) => void | string | Promise<void | string>;
+  /**
    * Runs for every import starting (but excluding) the entrypoints
    * Can be used to implement custom logic or rewrite a specifier
    * If false is returned, the import will be skipped entirely
