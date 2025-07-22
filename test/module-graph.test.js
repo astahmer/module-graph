@@ -309,6 +309,23 @@ describe('plugins', () => {
     assert.equal(moduleGraph.foo, 'bar');
   });
 
+  it('transformSource', async () => {
+    const extractPlugin = {
+      name: 'transformSource-plugin',
+      transformSource: ({ source }) => {
+        const match = source.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+        const result = match ? match[1].trim() : null;
+        return result;
+      }
+    }
+    const moduleGraph = await createModuleGraph('./App.html', { 
+      basePath: fixture('plugins-transform-source'),
+      plugins: [extractPlugin]
+    });
+
+    assert.deepStrictEqual(moduleGraph.getUniqueModules(), ['App.html', 'Counter.html']);
+  });
+
   it('handleImport - boolean', async () => {
     /**
      * index.js

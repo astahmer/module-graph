@@ -103,7 +103,26 @@ export async function createModuleGraph(entrypoints, options = {}) {
   while (importsToScan.size) {
     for (const dep of importsToScan) {
       importsToScan.delete(dep);
-      const source = fs.readFileSync(path.join(basePath, dep)).toString();
+      let source = fs.readFileSync(path.join(basePath, dep)).toString();
+
+      /**
+       * [PLUGINS] - transformSource
+       */
+      for (const { name, transformSource } of plugins) {
+        try {
+          const result = await /** @type {void | string} */ (transformSource?.({
+            source,
+          }));
+          
+          if (result) {
+            source = result;
+          }
+        } catch(e) {
+          const { stack } = /** @type {Error} */ (e);
+          const error = new Error(`[PLUGIN] "${name}" failed on the "handleImport" hook.\n\n${stack}`);
+          throw error;
+        }
+      }
 
       const [imports, _, facade, hasModuleSyntax] = parse(source);
       importLoop: for (let { n: importee, ss: start, se: end } of imports) {
