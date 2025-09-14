@@ -32,7 +32,7 @@ export class ModuleGraph {
   }
 
   /**
-   * @param {string | ((path: string) => boolean)} targetModule 
+   * @param {string | ((path: string) => boolean)} targetModule
    * @returns {Array<Module>}
    */
   get(targetModule) {
@@ -70,20 +70,25 @@ export class ModuleGraph {
    */
   findImportChains(targetModule) {
     /**
-     * @type {string[][]}
-     */
+   * @type {string[][]}
+   */
     const chains = [];
+    const seen = new Set();
 
     /**
-     * @param {string} module 
-     * @param {string[]} path 
-     * @returns 
+     * @param {string} module
+     * @param {string[]} path
+     * @returns
      */
     const dfs = (module, path) => {
       const condition =
         typeof targetModule === "function"
           ? targetModule(module)
           : module === targetModule;
+
+      if (seen.has(module)) return;
+      seen.add(module);
+
       if (condition) {
         chains.push(path);
         return;
