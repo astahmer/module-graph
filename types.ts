@@ -62,7 +62,7 @@ export interface Plugin {
   }) => void | boolean | string | Promise<void | boolean | string>;
   /**
    * Runs for every module
-   * Can be used to analyze the module (or its source), and add 
+   * Can be used to analyze the module (or its source), and add
    * additional meta information to the Module object
    * You can mutate the module directly, no need to return it
    */
@@ -84,3 +84,32 @@ export interface Plugin {
    */
   end?: (moduleGraph: ModuleGraph) => void | Promise<void>;
 }
+
+export interface LexerParseResult {
+  filename: string
+  imports: Iterable<LexerImportSpecifier>
+  facade: boolean
+  hasModuleSyntax: boolean
+}
+
+export interface LexerImportSpecifier {
+  /** Source name  */
+  n?: string
+  /** Import start index  */
+  ss: number
+  /** Import end index  */
+  se: number
+}
+
+export interface ModuleLexer {
+  parseAsync: (params: {
+    input: Array<{
+      filename: string,
+      code: string
+    }>
+  }) => Promise<{
+    output: Array<LexerParseResult>
+  }>
+}
+
+export type ModuleLexerOption = ModuleLexer | "rs" | "es"

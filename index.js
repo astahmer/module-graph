@@ -2,13 +2,11 @@ import fs from "fs";
 import path from "path";
 import { pathToFileURL, fileURLToPath } from "url";
 import { builtinModules } from "module";
-import rsModuleLexer from 'rs-module-lexer';
 import { ResolverFactory } from 'oxc-resolver';
 import { ModuleGraph } from "./ModuleGraph.js";
 import { extractPackageNameFromSpecifier, isBareModuleSpecifier, isScopedPackage, toUnix } from "./utils.js";
 import * as pm from 'picomatch';
 
-const { parseAsync } = rsModuleLexer;
 const picomatch = pm.default;
 
 /**
@@ -27,6 +25,7 @@ const picomatch = pm.default;
  *   include?: string[],
  *   exclude?: string[]
  *  },
+ *  moduleLexer?: import("./types.js").ModuleLexerOption,
  *  exportConditions?: NapiResolveOptions["conditionNames"],
  *  ignoreDynamicImport?: boolean,
  *  exclude?: Array<string | ((importee: string) => boolean)>,
@@ -49,6 +48,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
     exclude: excludePatterns = [],
     foreignModules: foreignModulePatterns = [],
     virtualModules: virtualModulePatterns = [],
+    moduleLexer: propModuleLexer,
     ...resolveOptions
   } = options;
   if (external.ignore && external.include?.length) {
@@ -69,8 +69,8 @@ export async function createModuleGraph(entrypoints, options = {}) {
 
   const processedEntrypoints = (typeof entrypoints === "string" ? [entrypoints] : entrypoints);
   const modules = processedEntrypoints.map((e) => {
-      const absEntryPoint = e.startsWith(basePath) ? e : path.join(basePath, e);
-      return toUnix(path.relative(basePath, absEntryPoint));
+    const absEntryPoint = e.startsWith(basePath) ? e : path.join(basePath, e);
+    return toUnix(path.relative(basePath, absEntryPoint));
   });
 
   /**
@@ -87,7 +87,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
         basePath,
         exportConditions,
       });
-    } catch(e) {
+    } catch (e) {
       const { stack } = /** @type {Error} */ (e);
       const error = new Error(`[PLUGIN] "${name}" failed on the "start" hook.\n\n${stack}`);
       throw error;
@@ -129,21 +129,28 @@ export async function createModuleGraph(entrypoints, options = {}) {
           if (result) {
             source = result;
           }
-        } catch(e) {
+        } catch (e) {
           const { stack } = /** @type {Error} */ (e);
           const error = new Error(`[PLUGIN] "${name}" failed on the "handleImport" hook.\n\n${stack}`);
           throw error;
         }
       }
 
-      const { output } = await parseAsync({ input: [{ filename, code: source }] })
+      let moduleLexer = propModuleLexer;
+      if (!moduleLexer || moduleLexer === "rs") {
+        moduleLexer = await import("./module-lexer/rs.js").then(m => m.rsLexer);
+      } else if (moduleLexer === "es") {
+        moduleLexer = await import("./module-lexer/es.js").then(m => m.esLexer);
+      }
+      const { output } = await /** @type {import('./types.js').ModuleLexer} */ (moduleLexer).parseAsync({ input: [{ filename, code: source }] })
+
       const { imports, facade, hasModuleSyntax } = output[0];
       importLoop: for (let { n: importee, ss: start, se: end } of imports) {
         const importString = source.substring(start, end);
         if (!importee) continue;
-        const isVirtualModule = virtualModules.some((match) => match(/** @type {string} */ (importee)));
+        const isVirtualModule = virtualModules.some((match) => match(/** @type {string} */(importee)));
         if (ignoreDynamicImport && importString.startsWith('import(')) continue;
-        if (!foreignModules.some((match) => match(/** @type {string} */ (importee))) && !isVirtualModule) {
+        if (!foreignModules.some((match) => match(/** @type {string} */(importee))) && !isVirtualModule) {
           if (isBareModuleSpecifier(importee) && external.ignore) continue;
           if (isBareModuleSpecifier(importee) && external.exclude?.length && external.exclude?.includes(extractPackageNameFromSpecifier(importee))) continue;
           if (isBareModuleSpecifier(importee) && external.include?.length && !external.include?.includes(extractPackageNameFromSpecifier(importee))) continue;
@@ -165,7 +172,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
             } else if (result === false) {
               continue importLoop;
             }
-          } catch(e) {
+          } catch (e) {
             const { stack } = /** @type {Error} */ (e);
             const error = new Error(`[PLUGIN] "${name}" failed on the "handleImport" hook.\n\n${stack}`);
             throw error;
@@ -212,7 +219,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
           try {
             const resolved = /** @type {{path: string}} */ (await resolve.async(path.dirname(importer), importee));
             resolvedURL = pathToFileURL(resolved.path);
-          } catch(e) {
+          } catch (e) {
             console.error(`Failed to resolve "${importee}" from "${importer}".`);
             continue;
           }
@@ -225,7 +232,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
          * Handle excludes, we do this here, because we want the resolved file paths, like
          * `node_modules/foo/index.js` to be excluded, not the importee, which would just be `foo`
          */
-        if (exclude.some(match => match(/** @type {string} */ (pathToDependency)))) {
+        if (exclude.some(match => match(/** @type {string} */(pathToDependency)))) {
           continue;
         }
 
@@ -264,10 +271,10 @@ export async function createModuleGraph(entrypoints, options = {}) {
           importedBy: [],
           facade: false,
           hasModuleSyntax: !foreignModules.some((match) =>
-            match(/** @type {string} */ (pathToDependency))
+            match(/** @type {string} */(pathToDependency))
           ),
           source: '',
-          ...(packageRoot ? {packageRoot} : {}),
+          ...(packageRoot ? { packageRoot } : {}),
         }
 
         if (isBareModuleSpecifier(importee)) {
@@ -280,7 +287,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
 
         if (
           !foreignModules.some((match) =>
-              match(/** @type {string} */ (pathToDependency))
+            match(/** @type {string} */(pathToDependency))
           ) &&
           !moduleGraph.graph.has(pathToDependency)
         ) {
@@ -322,7 +329,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
       for (const { name, analyze } of plugins) {
         try {
           await analyze?.(currentModule);
-        } catch(e) {
+        } catch (e) {
           const { stack } = /** @type {Error} */ (e);
           const error = new Error(`[PLUGIN] "${name}" failed on the "analyze" hook.\n\n${stack}`);
           throw error;
@@ -337,7 +344,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
   for (const { name, end } of plugins) {
     try {
       await end?.(moduleGraph);
-    } catch(e) {
+    } catch (e) {
       const { stack } = /** @type {Error} */ (e);
       const error = new Error(`[PLUGIN] "${name}" failed on the "end" hook.\n\n${stack}`);
       throw error;
