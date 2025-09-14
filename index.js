@@ -137,12 +137,17 @@ export async function createModuleGraph(entrypoints, options = {}) {
         }
       }
 
-      let moduleLexer = propModuleLexer;
-      if (!moduleLexer || moduleLexer === "rs") {
+      /** @type {import('./types.js').ModuleLexer | undefined} */
+      let moduleLexer;
+      if (!propModuleLexer || propModuleLexer === "rs") {
         moduleLexer = await import("./module-lexer/rs.js").then(m => m.rsLexer);
-      } else if (moduleLexer === "es") {
+      } else if (propModuleLexer === "es") {
         moduleLexer = await import("./module-lexer/es.js").then(m => m.esLexer);
       }
+      if (!moduleLexer) {
+        throw new Error(`Invalid module lexer option: ${propModuleLexer}, available options are "rs" and "es" or a custom module lexer.`);
+      }
+
       const { output } = await /** @type {import('./types.js').ModuleLexer} */ (moduleLexer).parseAsync({ input: [{ filename, code: source }] })
 
       const { imports, facade, hasModuleSyntax } = output[0];
