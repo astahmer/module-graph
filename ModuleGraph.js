@@ -20,6 +20,7 @@ export class ModuleGraph {
      */
     this.graph = new Map();
     this.entrypoints = (typeof entrypoints === 'string' ? [entrypoints] : entrypoints).map(e => path.posix.normalize(e));
+    this.relativeEntrypoints = this.entrypoints.map(e => path.relative(basePath, e));
     this.basePath = basePath;
     /**
      * @type {Map<string, ExternalModule>}
@@ -102,7 +103,7 @@ export class ModuleGraph {
       }
     };
 
-    for (const entrypoint of this.entrypoints) {
+    for (const entrypoint of this.relativeEntrypoints) {
       dfs(entrypoint, [entrypoint]);
     }
 

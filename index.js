@@ -98,9 +98,10 @@ export async function createModuleGraph(entrypoints, options = {}) {
 
   let moduleGraph = new ModuleGraph(basePath, entrypoints);
   for (const module of modules) {
+    const url = pathToFileURL(module);
     moduleGraph.modules.set(module, {
-      href: pathToFileURL(module).href,
-      pathname: pathToFileURL(module).pathname,
+      href: url.href,
+      pathname: url.pathname,
       path: module,
       source: '',
       facade: false,
