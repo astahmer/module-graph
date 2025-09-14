@@ -3,6 +3,9 @@
   "version": "0.13.0",
   "description": "Creates a module graph based on a given entrypoint.",
   "bin": "./bin/index.js",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "start": "node --watch index.js",
     "test": "node --test --experimental-test-coverage test/module-graph.test.js",
