@@ -123,6 +123,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
       for (const { name, transformSource } of plugins) {
         try {
           const result = await /** @type {void | string} */ (transformSource?.({
+            filename,
             source,
           }));
 
@@ -131,7 +132,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
           }
         } catch (e) {
           const { stack } = /** @type {Error} */ (e);
-          const error = new Error(`[PLUGIN] "${name}" failed on the "handleImport" hook.\n\n${stack}`);
+          const error = new Error(`[PLUGIN] "${name}" failed on the "transformSource" hook.\n\n${stack}`);
           throw error;
         }
       }

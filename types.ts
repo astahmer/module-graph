@@ -47,6 +47,7 @@ export interface Plugin {
    * example Vue or Svelte components
    */
   transformSource?: (params: {
+    filename: string;
     source: string
   }) => void | string | Promise<void | string>;
   /**
