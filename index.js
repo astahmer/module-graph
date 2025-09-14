@@ -2,12 +2,13 @@ import fs from "fs";
 import path from "path";
 import { pathToFileURL, fileURLToPath } from "url";
 import { builtinModules } from "module";
-import { init, parse } from "es-module-lexer";
+import rsModuleLexer from 'rs-module-lexer';
 import { ResolverFactory } from 'oxc-resolver';
 import { ModuleGraph } from "./ModuleGraph.js";
 import { extractPackageNameFromSpecifier, isBareModuleSpecifier, isScopedPackage, toUnix } from "./utils.js";
 import * as pm from 'picomatch';
 
+const { parseAsync } = rsModuleLexer;
 const picomatch = pm.default;
 
 /**
@@ -29,13 +30,15 @@ const picomatch = pm.default;
  *  exportConditions?: NapiResolveOptions["conditionNames"],
  *  ignoreDynamicImport?: boolean,
  *  exclude?: Array<string | ((importee: string) => boolean)>,
+ *  foreignModules?: Array<string | ((importee: string) => boolean)>,
+ *  virtualModules?: Array<string | ((importee: string) => boolean)>,
  * }} options
  * @returns {Promise<ModuleGraph>}
  */
 export async function createModuleGraph(entrypoints, options = {}) {
-  const { 
-    plugins = [], 
-    basePath = process.cwd(), 
+  const {
+    plugins = [],
+    basePath = process.cwd(),
     exportConditions = ["node", "import"],
     ignoreDynamicImport = false,
     external = {
@@ -44,12 +47,20 @@ export async function createModuleGraph(entrypoints, options = {}) {
       exclude: [],
     },
     exclude: excludePatterns = [],
-    ...resolveOptions 
+    foreignModules: foreignModulePatterns = [],
+    virtualModules: virtualModulePatterns = [],
+    ...resolveOptions
   } = options;
   if (external.ignore && external.include?.length) {
     throw new Error('Cannot use both "ignore" and "include" in the external option.');
   }
   const exclude = excludePatterns.map(p => typeof p === 'string' ? picomatch(p) : p);
+  const foreignModules = foreignModulePatterns.map((p) =>
+    typeof p === 'string' ? picomatch(p) : p
+  );
+  const virtualModules = virtualModulePatterns.map((p) =>
+    typeof p === 'string' ? picomatch(p) : p
+  );
 
   const resolve = new ResolverFactory({
     ...resolveOptions,
@@ -57,7 +68,10 @@ export async function createModuleGraph(entrypoints, options = {}) {
   });
 
   const processedEntrypoints = (typeof entrypoints === "string" ? [entrypoints] : entrypoints);
-  const modules = processedEntrypoints.map(e => toUnix(path.relative(basePath, path.join(basePath, e))));
+  const modules = processedEntrypoints.map((e) => {
+      const absEntryPoint = e.startsWith(basePath) ? e : path.join(basePath, e);
+      return toUnix(path.relative(basePath, absEntryPoint));
+  });
 
   /**
    * [PLUGINS] - start
@@ -97,13 +111,11 @@ export async function createModuleGraph(entrypoints, options = {}) {
     moduleGraph.graph.set(module, new Set());
   }
 
-  /** Init es-module-lexer wasm */
-  await init;
-
   while (importsToScan.size) {
     for (const dep of importsToScan) {
       importsToScan.delete(dep);
-      let source = fs.readFileSync(path.join(basePath, dep)).toString();
+      const filename = path.join(basePath, dep);
+      let source = fs.readFileSync(filename).toString();
 
       /**
        * [PLUGINS] - transformSource
@@ -113,7 +125,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
           const result = await /** @type {void | string} */ (transformSource?.({
             source,
           }));
-          
+
           if (result) {
             source = result;
           }
@@ -124,14 +136,18 @@ export async function createModuleGraph(entrypoints, options = {}) {
         }
       }
 
-      const [imports, _, facade, hasModuleSyntax] = parse(source);
+      const { output } = await parseAsync({ input: [{ filename, code: source }] })
+      const { imports, facade, hasModuleSyntax } = output[0];
       importLoop: for (let { n: importee, ss: start, se: end } of imports) {
         const importString = source.substring(start, end);
         if (!importee) continue;
+        const isVirtualModule = virtualModules.some((match) => match(/** @type {string} */ (importee)));
         if (ignoreDynamicImport && importString.startsWith('import(')) continue;
-        if (isBareModuleSpecifier(importee) && external.ignore) continue;
-        if (isBareModuleSpecifier(importee) && external.exclude?.length && external.exclude?.includes(extractPackageNameFromSpecifier(importee))) continue;
-        if (isBareModuleSpecifier(importee) && external.include?.length && !external.include?.includes(extractPackageNameFromSpecifier(importee))) continue;
+        if (!foreignModules.some((match) => match(/** @type {string} */ (importee))) && !isVirtualModule) {
+          if (isBareModuleSpecifier(importee) && external.ignore) continue;
+          if (isBareModuleSpecifier(importee) && external.exclude?.length && external.exclude?.includes(extractPackageNameFromSpecifier(importee))) continue;
+          if (isBareModuleSpecifier(importee) && external.include?.length && !external.include?.includes(extractPackageNameFromSpecifier(importee))) continue;
+        }
 
         /**
          * [PLUGINS] - handleImport
@@ -143,7 +159,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
               importer: dep,
               importee,
             }));
-  
+
             if (typeof result === 'string') {
               importee = result;
             } else if (result === false) {
@@ -166,6 +182,9 @@ export async function createModuleGraph(entrypoints, options = {}) {
          * [PLUGINS] - resolve
          */
         let resolvedURL;
+        if (isVirtualModule) {
+          resolvedURL = importee;
+        }
         for (const { name, resolve } of plugins) {
           try {
             const result = await resolve?.({
@@ -198,7 +217,9 @@ export async function createModuleGraph(entrypoints, options = {}) {
             continue;
           }
         }
-        const pathToDependency = toUnix(path.relative(basePath, fileURLToPath(resolvedURL)));
+        const pathToDependency = isVirtualModule
+          ? importee
+          : toUnix(path.relative(basePath, fileURLToPath(resolvedURL)));
 
         /**
          * Handle excludes, we do this here, because we want the resolved file paths, like
@@ -206,11 +227,11 @@ export async function createModuleGraph(entrypoints, options = {}) {
          */
         if (exclude.some(match => match(/** @type {string} */ (pathToDependency)))) {
           continue;
-        }      
+        }
 
-        /** 
+        /**
          * Get the packageRoot of the external dependency, which is useful for getting
-         * to the package.json, for example. You can't always `require.resolve` it, 
+         * to the package.json, for example. You can't always `require.resolve` it,
          * if it's not included in the packages package exports.
          */
         let packageRoot;
@@ -237,25 +258,32 @@ export async function createModuleGraph(entrypoints, options = {}) {
 
         /** @type {Module} */
         const module = {
-          href: resolvedURL.href,
-          pathname: resolvedURL.pathname,
+          href: typeof resolvedURL === 'object' ? resolvedURL.href : '',
+          pathname: typeof resolvedURL === 'object' ? resolvedURL.pathname : importee,
           path: pathToDependency,
           importedBy: [],
           facade: false,
-          hasModuleSyntax: true,
+          hasModuleSyntax: !foreignModules.some((match) =>
+            match(/** @type {string} */ (pathToDependency))
+          ),
           source: '',
           ...(packageRoot ? {packageRoot} : {}),
         }
 
         if (isBareModuleSpecifier(importee)) {
-          moduleGraph.externalModules.set(resolvedURL.pathname, {
+          moduleGraph.externalModules.set(module.pathname, {
             ...module,
             package: /** @type {string} */ (pkg),
             importSpecifier: importee
           });
         }
-        
-        if (!moduleGraph.graph.has(pathToDependency)) {
+
+        if (
+          !foreignModules.some((match) =>
+              match(/** @type {string} */ (pathToDependency))
+          ) &&
+          !moduleGraph.graph.has(pathToDependency)
+        ) {
           importsToScan.add(pathToDependency);
         }
 
@@ -266,7 +294,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
           moduleGraph.graph.set(dep, new Set());
         }
         /** @type {Set<string>} */ (moduleGraph.graph.get(dep)).add(pathToDependency);
-        
+
         const importedModule = moduleGraph.modules.get(pathToDependency);
         if (importedModule && !importedModule.importedBy.includes(dep)) {
           importedModule.importedBy.push(dep);
