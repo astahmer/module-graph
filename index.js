@@ -68,10 +68,12 @@ export async function createModuleGraph(entrypoints, options = {}) {
   });
 
   const processedEntrypoints = (typeof entrypoints === "string" ? [entrypoints] : entrypoints);
-  const modules = processedEntrypoints.map((e) => {
+  /** @param {string} e */
+  const toRelative = (e) => {
     const absEntryPoint = e.startsWith(basePath) ? e : path.join(basePath, e);
     return toUnix(path.relative(basePath, absEntryPoint));
-  });
+  }
+  const modules = processedEntrypoints.map(toRelative);
 
   /**
    * [PLUGINS] - start
@@ -274,7 +276,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
         const module = {
           href: typeof resolvedURL === 'object' ? resolvedURL.href : '',
           pathname: typeof resolvedURL === 'object' ? resolvedURL.pathname : importee,
-          path: pathToDependency,
+          path: toRelative(pathToDependency),
           importedBy: [],
           facade: false,
           hasModuleSyntax: !foreignModules.some((match) =>
