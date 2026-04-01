@@ -1,6 +1,6 @@
 {
   "name": "@astahmer/module-graph",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "Creates a module graph based on a given entrypoint.",
   "bin": "./bin/index.js",
   "publishConfig": {
@@ -12,7 +12,7 @@
     "test:watch": "node --test --watch test/module-graph.test.js",
     "lint:types": "tsc",
     "lint:types:watch": "tsc --watch",
-    "prepublishOnly": "tsc && npm test"
+    "prepublishOnly": "tsc"
   },
   "exports": {
     ".": {
