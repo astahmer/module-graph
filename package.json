@@ -1,6 +1,6 @@
 {
   "name": "@astahmer/module-graph",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "Creates a module graph based on a given entrypoint.",
   "bin": "./bin/index.js",
   "publishConfig": {
@@ -35,6 +35,7 @@
   "files": [
     "README.md",
     "dist-types",
+    "module-lexer",
     "index.js",
     "ModuleGraph.js",
     "utils.js",
