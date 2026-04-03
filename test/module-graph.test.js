@@ -103,7 +103,7 @@ describe('createModuleGraph', () => {
   it('circular', async () => {
     /**
      * a.js -> b.js -> c.js -> a.js
-     * 
+     *
      * Doesn't result in an infinite loop
      */
     const moduleGraph = await createModuleGraph('./a.js', { basePath: fixture('circular') });
@@ -116,7 +116,7 @@ describe('createModuleGraph', () => {
      * d.js -> c.js
      */
     const moduleGraph = await createModuleGraph(['./a.js', './d.js'], { basePath: fixture('multiple-entrypoints-import-chains-circular') });
-    
+
     const chains = moduleGraph.findImportChains((p) => p.endsWith('c.js'));
     assert.deepStrictEqual(chains[0], ['a.js', 'b.js', 'c.js']);
     assert.deepStrictEqual(chains[1], ['d.js', 'c.js']);
@@ -138,7 +138,7 @@ describe('createModuleGraph', () => {
       Error,
     );
 
-    const moduleGraph = await createModuleGraph('./index.ts', { basePath: fixture('import-attributes'), foreignModules: ['**/*.css'], external: {ignore: true} });
+    const moduleGraph = await createModuleGraph('./index.ts', { basePath: fixture('import-attributes'), foreignModules: ['**/*.css'], external: { ignore: true } });
 
     assert(moduleGraph.graph.get('index.ts').has('data.json'));
     assert(moduleGraph.graph.get('index.ts').has('styles.css'));
@@ -148,7 +148,7 @@ describe('createModuleGraph', () => {
   it('virtual-modules', async () => {
     // When a virtual module is not associated with a file, it should be listed as a foreignModule as well.
     // In cases where there is an associated file a plugin would be used to resolve the virtual module.
-    const moduleGraph = await createModuleGraph('./index.js', { basePath: fixture('virtual-modules'), foreignModules: ['virtual:*'], virtualModules: ['virtual:*'], external: {ignore: true} });
+    const moduleGraph = await createModuleGraph('./index.js', { basePath: fixture('virtual-modules'), foreignModules: ['virtual:*'], virtualModules: ['virtual:*'], external: { ignore: true } });
 
     assert(moduleGraph.graph.get('index.js').has('virtual:module'));
     assert.equal(moduleGraph.modules.get('virtual:module').hasModuleSyntax, false);
@@ -207,7 +207,7 @@ describe('createModuleGraph', () => {
     /**
      * a.js -> b.js -> foo
      */
-    const moduleGraph = await createModuleGraph('./a.js', { 
+    const moduleGraph = await createModuleGraph('./a.js', {
       basePath: fixture('ignore-external'),
       external: {
         ignore: true
@@ -222,7 +222,7 @@ describe('createModuleGraph', () => {
     /**
      * a.js -> b.js -> foo, bar
      */
-    const moduleGraph = await createModuleGraph('./a.js', { 
+    const moduleGraph = await createModuleGraph('./a.js', {
       basePath: fixture('external-exclude'),
       external: {
         exclude: ['foo']
@@ -237,7 +237,7 @@ describe('createModuleGraph', () => {
     /**
      * a.js -> b.js -> foo, bar
      */
-    const moduleGraph = await createModuleGraph('./a.js', { 
+    const moduleGraph = await createModuleGraph('./a.js', {
       basePath: fixture('external-exclude'),
       external: {
         include: ['foo']
@@ -249,7 +249,7 @@ describe('createModuleGraph', () => {
 
   it('external ignore AND include throws error', async () => {
     try {
-      await createModuleGraph('./a.js', { 
+      await createModuleGraph('./a.js', {
         basePath: fixture('ignore-external'),
         external: {
           ignore: true,
@@ -257,7 +257,7 @@ describe('createModuleGraph', () => {
         }
       });
       assert(false);
-    } catch(e) {
+    } catch (e) {
       assert.equal(e.message, "Cannot use both \"ignore\" and \"include\" in the external option.");
     }
   });
@@ -268,7 +268,7 @@ describe('createModuleGraph', () => {
      */
     const moduleGraph = await createModuleGraph('./index.js', { basePath: fixture('external-dependencies-scoped-package') });
     const [m] = moduleGraph.get('node_modules/@foo/bar/index.js');
-    
+
     assert(m.packageRoot.pathname.endsWith('test/fixtures/external-dependencies-scoped-package/node_modules/@foo/bar'));
   });
 
@@ -287,6 +287,54 @@ describe('createModuleGraph', () => {
     const [m] = moduleGraph.get('../../node_modules/bar/index.js');
     assert(m.packageRoot.pathname.endsWith('monorepo/node_modules/bar'));
   });
+
+  it('ignores type-only imports', async () => {
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => {
+      errors.push(args.join(' '));
+    };
+
+    try {
+      const moduleGraph = await createModuleGraph('./index.ts', { basePath: fixture('typescript-type-imports') });
+
+      assert.deepStrictEqual(moduleGraph.getUniqueModules(), ['index.ts', 'runtime.ts']);
+      assert.equal(errors.length, 0);
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  it('can include type-only imports', async () => {
+    const moduleGraph = await createModuleGraph('./index.ts', {
+      basePath: fixture('typescript-local-type-imports'),
+      includeTypeOnlyImports: true,
+    });
+
+    assert.deepStrictEqual(moduleGraph.getUniqueModules(), ['index.ts', 'types.ts', 'runtime.ts']);
+    assert(moduleGraph.graph.get('index.ts').has('types.ts'));
+  });
+
+  it('resolves extensionless TypeScript imports by default', async () => {
+    const moduleGraph = await createModuleGraph('./index.ts', { basePath: fixture('typescript-node') });
+
+    assert.deepStrictEqual(moduleGraph.getUniqueModules(), ['index.ts', 'foo.ts']);
+  });
+
+  it('resolves .js TypeScript specifiers via extension aliases by default', async () => {
+    const moduleGraph = await createModuleGraph('./index.ts', {
+      basePath: fixture('typescript'),
+      external: { ignore: true },
+    });
+
+    assert.deepStrictEqual(moduleGraph.getUniqueModules(), ['index.ts', 'foo.ts']);
+  });
+
+  it('resolves extensionless TSX imports by default', async () => {
+    const moduleGraph = await createModuleGraph('./index.tsx', { basePath: fixture('typescript-tsx') });
+
+    assert.deepStrictEqual(moduleGraph.getUniqueModules(), ['index.tsx', 'component.tsx']);
+  });
 });
 
 describe('plugins', () => {
@@ -299,7 +347,7 @@ describe('plugins', () => {
         assert.deepStrictEqual(exportConditions, ["node", "import"]);
       }
     }
-    await createModuleGraph('./index.js', { 
+    await createModuleGraph('./index.js', {
       basePath: fixture('plugins-start'),
       plugins: [plugin]
     });
@@ -317,7 +365,7 @@ describe('plugins', () => {
         moduleGraph.foo = 'bar';
       }
     }
-    const moduleGraph = await createModuleGraph('./index.js', { 
+    const moduleGraph = await createModuleGraph('./index.js', {
       basePath: fixture('plugins-end'),
       plugins: [plugin]
     });
@@ -336,7 +384,7 @@ describe('plugins', () => {
         return result;
       }
     }
-    const moduleGraph = await createModuleGraph('./App.html', { 
+    const moduleGraph = await createModuleGraph('./App.html', {
       basePath: fixture('plugins-transform-source'),
       plugins: [extractPlugin]
     });
@@ -359,7 +407,7 @@ describe('plugins', () => {
         }
       }
     }
-    const moduleGraph = await createModuleGraph('./index.js', { 
+    const moduleGraph = await createModuleGraph('./index.js', {
       basePath: fixture('plugins-handle-import-boolean'),
       plugins: [skipPlugin]
     });
@@ -382,7 +430,7 @@ describe('plugins', () => {
         }
       }
     }
-    const moduleGraph = await createModuleGraph('./index.js', { 
+    const moduleGraph = await createModuleGraph('./index.js', {
       basePath: fixture('plugins-handle-import-string'),
       plugins: [skipPlugin]
     });
@@ -404,8 +452,8 @@ describe('plugins', () => {
         return moduleResolve('./baz.js', pathToFileURL(importer), exportConditions);
       }
     }
-    
-    const moduleGraph = await createModuleGraph('./index.js', { 
+
+    const moduleGraph = await createModuleGraph('./index.js', {
       basePath: fixture('plugins-resolve'),
       plugins: [resolvePlugin]
     });
@@ -428,8 +476,8 @@ describe('plugins', () => {
         called = true;
       }
     }
-    
-    const moduleGraph = await createModuleGraph('./index.js', { 
+
+    const moduleGraph = await createModuleGraph('./index.js', {
       basePath: fixture('plugins-resolve'),
       plugins: [resolvePlugin1, resolvePlugin2]
     });
@@ -447,7 +495,7 @@ describe('plugins', () => {
         }
       }
     }
-    const moduleGraph = await createModuleGraph('./index.js', { 
+    const moduleGraph = await createModuleGraph('./index.js', {
       basePath: fixture('plugins-analyze'),
       plugins: [analyzePlugin]
     });
@@ -457,7 +505,7 @@ describe('plugins', () => {
   });
 
   it('exclude', async () => {
-    const moduleGraph = await createModuleGraph('./index.js', { 
+    const moduleGraph = await createModuleGraph('./index.js', {
       basePath: fixture('exclude'),
       exclude: [
         'ignore.js',

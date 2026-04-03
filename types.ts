@@ -86,6 +86,23 @@ export interface Plugin {
   end?: (moduleGraph: ModuleGraph) => void | Promise<void>;
 }
 
+export interface CreateModuleGraphOptions extends NapiResolveOptions {
+  plugins?: Plugin[]
+  basePath?: string
+  external?: {
+    ignore?: boolean
+    include?: string[]
+    exclude?: string[]
+  }
+  moduleLexer?: ModuleLexerOption
+  exportConditions?: NapiResolveOptions['conditionNames']
+  includeTypeOnlyImports?: boolean
+  ignoreDynamicImport?: boolean
+  exclude?: Array<string | ((importee: string) => boolean)>
+  foreignModules?: Array<string | ((importee: string) => boolean)>
+  virtualModules?: Array<string | ((importee: string) => boolean)>
+}
+
 export interface LexerParseResult {
   filename: string
   imports: Iterable<LexerImportSpecifier>
@@ -96,6 +113,8 @@ export interface LexerParseResult {
 export interface LexerImportSpecifier {
   /** Source name  */
   n?: string
+  /** Type of import statement */
+  t?: number
   /** Import start index  */
   ss: number
   /** Import end index  */

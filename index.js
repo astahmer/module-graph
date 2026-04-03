@@ -9,6 +9,14 @@ import * as pm from 'picomatch';
 
 const picomatch = pm.default;
 
+const DEFAULT_EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.mts', '.cts', '.json', '.node'];
+const DEFAULT_EXTENSION_ALIAS = {
+  '.js': ['.js', '.ts', '.tsx', '.jsx'],
+  '.jsx': ['.jsx', '.tsx', '.ts', '.js'],
+  '.mjs': ['.mjs', '.mts'],
+  '.cjs': ['.cjs', '.cts'],
+};
+
 /**
  * @typedef {import('./types.js').Module} Module
  * @typedef {import('./types.js').Plugin} Plugin
@@ -27,6 +35,7 @@ const picomatch = pm.default;
  *  },
  *  moduleLexer?: import("./types.js").ModuleLexerOption,
  *  exportConditions?: NapiResolveOptions["conditionNames"],
+ *  includeTypeOnlyImports?: boolean,
  *  ignoreDynamicImport?: boolean,
  *  exclude?: Array<string | ((importee: string) => boolean)>,
  *  foreignModules?: Array<string | ((importee: string) => boolean)>,
@@ -39,6 +48,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
     plugins = [],
     basePath = process.cwd(),
     exportConditions = ["node", "import"],
+    includeTypeOnlyImports = false,
     ignoreDynamicImport = false,
     external = {
       ignore: false,
@@ -62,10 +72,17 @@ export async function createModuleGraph(entrypoints, options = {}) {
     typeof p === 'string' ? picomatch(p) : p
   );
 
-  const resolve = new ResolverFactory({
+  const effectiveResolveOptions = {
     ...resolveOptions,
     conditionNames: exportConditions,
-  });
+    extensions: resolveOptions.extensions ?? DEFAULT_EXTENSIONS,
+    extensionAlias: {
+      ...DEFAULT_EXTENSION_ALIAS,
+      ...resolveOptions.extensionAlias,
+    },
+  };
+
+  const resolve = new ResolverFactory(effectiveResolveOptions);
 
   const processedEntrypoints = (typeof entrypoints === "string" ? [entrypoints] : entrypoints);
   /** @param {string} e */
@@ -73,6 +90,8 @@ export async function createModuleGraph(entrypoints, options = {}) {
     const absEntryPoint = e.startsWith(basePath) ? e : path.join(basePath, e);
     return toUnix(path.relative(basePath, absEntryPoint));
   }
+  /** @param {string} importStatement */
+  const isTypeOnlyImport = (importStatement) => /^\s*import\s+type\b/.test(importStatement);
   const modules = processedEntrypoints.map(toRelative);
 
   /**
@@ -142,9 +161,10 @@ export async function createModuleGraph(entrypoints, options = {}) {
 
       /** @type {import('./types.js').ModuleLexer | undefined} */
       let moduleLexer;
-      if (!propModuleLexer || propModuleLexer === "rs") {
+      const selectedModuleLexer = propModuleLexer ?? (includeTypeOnlyImports ? 'es' : 'rs');
+      if (selectedModuleLexer === "rs") {
         moduleLexer = await import("./module-lexer/rs.js").then(m => m.rsLexer);
-      } else if (propModuleLexer === "es") {
+      } else if (selectedModuleLexer === "es") {
         moduleLexer = await import("./module-lexer/es.js").then(m => m.esLexer);
       }
       if (!moduleLexer) {
@@ -157,6 +177,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
       importLoop: for (let { n: importee, ss: start, se: end } of imports) {
         const importString = source.substring(start, end);
         if (!importee) continue;
+        if (!includeTypeOnlyImports && isTypeOnlyImport(importString)) continue;
         const isVirtualModule = virtualModules.some((match) => match(/** @type {string} */(importee)));
         if (ignoreDynamicImport && importString.startsWith('import(')) continue;
         if (!foreignModules.some((match) => match(/** @type {string} */(importee))) && !isVirtualModule) {
@@ -207,7 +228,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
               importee,
               importer,
               exportConditions,
-              ...resolveOptions,
+              ...effectiveResolveOptions,
             });
 
             if (result) {

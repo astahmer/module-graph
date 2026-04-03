@@ -28,6 +28,10 @@ const moduleGraph = await createModuleGraph(['./foo.js', './bar.js']);
 const moduleGraph = await createModuleGraph('./index.js', {
   basePath: process.cwd(),
   exportConditions: ['browser', 'import'],
+  /** Include `import type` edges in the graph. Defaults to false. */
+  includeTypeOnlyImports: true,
+  /** Defaults to JS/TS-aware resolution: .js, .jsx, .ts, .tsx, .mjs, .cjs, .mts, .cts, .json, .node */
+  extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
   /** Handle external modules */
   external: {
     /** Ignore all external modules imported via a bare module specifier */
@@ -56,6 +60,8 @@ const moduleGraph = await createModuleGraph('./index.js', {
 ```
 
 `createModuleGraph` analyzes only ESM-style imports, not `require`. However, if a CommonJS file is found and uses a dynamic import, it will include the dynamic import in the graph and any other imports that leads to.
+
+By default, `import type` statements are skipped so type-only packages without a runtime entrypoint do not produce noisy resolution failures. Set `includeTypeOnlyImports: true` if you want those edges included in the graph. When this option is enabled and you did not explicitly choose a lexer, `createModuleGraph` switches to `es-module-lexer` because the default Rust lexer does not currently emit pure type-only imports.
 
 ## CLI
 
