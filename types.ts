@@ -94,7 +94,6 @@ export interface CreateModuleGraphOptions extends NapiResolveOptions {
     include?: string[]
     exclude?: string[]
   }
-  moduleLexer?: ModuleLexerOption
   exportConditions?: NapiResolveOptions['conditionNames']
   includeTypeOnlyImports?: boolean
   ignoreDynamicImport?: boolean
@@ -102,34 +101,3 @@ export interface CreateModuleGraphOptions extends NapiResolveOptions {
   foreignModules?: Array<string | ((importee: string) => boolean)>
   virtualModules?: Array<string | ((importee: string) => boolean)>
 }
-
-export interface LexerParseResult {
-  filename: string
-  imports: Iterable<LexerImportSpecifier>
-  facade: boolean
-  hasModuleSyntax: boolean
-}
-
-export interface LexerImportSpecifier {
-  /** Source name  */
-  n?: string
-  /** Type of import statement */
-  t?: number
-  /** Import start index  */
-  ss: number
-  /** Import end index  */
-  se: number
-}
-
-export interface ModuleLexer {
-  parseAsync: (params: {
-    input: Array<{
-      filename: string,
-      code: string
-    }>
-  }) => Promise<{
-    output: Array<LexerParseResult>
-  }>
-}
-
-export type ModuleLexerOption = ModuleLexer | "rs" | "es"

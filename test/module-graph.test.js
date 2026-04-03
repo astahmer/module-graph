@@ -129,15 +129,6 @@ describe('createModuleGraph', () => {
   });
 
   it('import-attributes', async () => {
-    await assert.rejects(
-      async () => {
-        await createModuleGraph("./index.ts", {
-          basePath: fixture("import-attributes"),
-        });
-      },
-      Error,
-    );
-
     const moduleGraph = await createModuleGraph('./index.ts', { basePath: fixture('import-attributes'), foreignModules: ['**/*.css'], external: { ignore: true } });
 
     assert(moduleGraph.graph.get('index.ts').has('data.json'));

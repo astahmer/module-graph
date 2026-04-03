@@ -35,7 +35,6 @@
   "files": [
     "README.md",
     "dist-types",
-    "module-lexer",
     "index.js",
     "ModuleGraph.js",
     "utils.js",
@@ -52,12 +51,10 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "@rollup/plugin-typescript": "^11.1.6",
     "@thepassle/module-utils": "^0.2.0",
     "commander": "^12.0.0",
-    "es-module-lexer": "^1.7.0",
+    "oxc-parser": "^0.123.0",
     "oxc-resolver": "^1.9.3",
-    "picomatch": "^4.0.1",
-    "rs-module-lexer": "^2.5.1"
+    "picomatch": "^4.0.1"
   }
 }

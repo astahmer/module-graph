@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { pathToFileURL, fileURLToPath } from "url";
 import { builtinModules } from "module";
+import { parseSync } from 'oxc-parser';
 import { ResolverFactory } from 'oxc-resolver';
 import { ModuleGraph } from "./ModuleGraph.js";
 import { extractPackageNameFromSpecifier, isBareModuleSpecifier, isScopedPackage, toUnix } from "./utils.js";
@@ -33,7 +34,6 @@ const DEFAULT_EXTENSION_ALIAS = {
  *   include?: string[],
  *   exclude?: string[]
  *  },
- *  moduleLexer?: import("./types.js").ModuleLexerOption,
  *  exportConditions?: NapiResolveOptions["conditionNames"],
  *  includeTypeOnlyImports?: boolean,
  *  ignoreDynamicImport?: boolean,
@@ -58,7 +58,6 @@ export async function createModuleGraph(entrypoints, options = {}) {
     exclude: excludePatterns = [],
     foreignModules: foreignModulePatterns = [],
     virtualModules: virtualModulePatterns = [],
-    moduleLexer: propModuleLexer,
     ...resolveOptions
   } = options;
   if (external.ignore && external.include?.length) {
@@ -90,9 +89,89 @@ export async function createModuleGraph(entrypoints, options = {}) {
     const absEntryPoint = e.startsWith(basePath) ? e : path.join(basePath, e);
     return toUnix(path.relative(basePath, absEntryPoint));
   }
-  /** @param {string} importStatement */
-  const isTypeOnlyImport = (importStatement) => /^\s*import\s+type\b/.test(importStatement);
   const modules = processedEntrypoints.map(toRelative);
+
+  /**
+   * @param {string} request
+   * @returns {string | undefined}
+   */
+  const getLiteralImportSpecifier = (request) => {
+    const quote = request.at(0);
+    if (!quote || request.length < 2) {
+      return undefined;
+    }
+    if ((quote !== '"' && quote !== "'" && quote !== '`') || request.at(-1) !== quote) {
+      return undefined;
+    }
+    const unwrapped = request.slice(1, -1);
+    if (quote === '`' && unwrapped.includes('${')) {
+      return undefined;
+    }
+    return unwrapped;
+  };
+
+  /**
+   * @param {string} filename
+   * @param {string} source
+   */
+  const getModuleInfo = (filename, source) => {
+    const result = parseSync(filename, source);
+    if (result.errors.length > 0) {
+      throw new Error(result.errors.map((error) => error.message).join('\n'));
+    }
+
+    const imports = [];
+
+    for (const staticImport of result.module.staticImports) {
+      const isTypeOnly = staticImport.entries.length > 0 && staticImport.entries.every((entry) => entry.isType);
+      imports.push({
+        n: staticImport.moduleRequest.value,
+        ss: staticImport.start,
+        se: staticImport.end,
+        isDynamic: false,
+        isTypeOnly,
+      });
+    }
+
+    for (const staticExport of result.module.staticExports) {
+      for (const entry of staticExport.entries) {
+        if (!entry.moduleRequest) {
+          continue;
+        }
+        imports.push({
+          n: entry.moduleRequest.value,
+          ss: staticExport.start,
+          se: staticExport.end,
+          isDynamic: false,
+          isTypeOnly: entry.isType,
+        });
+      }
+    }
+
+    for (const dynamicImport of result.module.dynamicImports) {
+      const importee = getLiteralImportSpecifier(
+        source.slice(dynamicImport.moduleRequest.start, dynamicImport.moduleRequest.end),
+      );
+
+      if (!importee) {
+        continue;
+      }
+
+      imports.push({
+        n: importee,
+        ss: dynamicImport.start,
+        se: dynamicImport.end,
+        isDynamic: true,
+        isTypeOnly: false,
+      });
+    }
+
+    return {
+      imports,
+      facade: false,
+      hasModuleSyntax: result.module.hasModuleSyntax,
+    };
+  };
 
   /**
    * [PLUGINS] - start
@@ -159,27 +238,12 @@ export async function createModuleGraph(entrypoints, options = {}) {
         }
       }
 
-      /** @type {import('./types.js').ModuleLexer | undefined} */
-      let moduleLexer;
-      const selectedModuleLexer = propModuleLexer ?? (includeTypeOnlyImports ? 'es' : 'rs');
-      if (selectedModuleLexer === "rs") {
-        moduleLexer = await import("./module-lexer/rs.js").then(m => m.rsLexer);
-      } else if (selectedModuleLexer === "es") {
-        moduleLexer = await import("./module-lexer/es.js").then(m => m.esLexer);
-      }
-      if (!moduleLexer) {
-        throw new Error(`Invalid module lexer option: ${propModuleLexer}, available options are "rs" and "es" or a custom module lexer.`);
-      }
-
-      const { output } = await /** @type {import('./types.js').ModuleLexer} */ (moduleLexer).parseAsync({ input: [{ filename, code: source }] })
-
-      const { imports, facade, hasModuleSyntax } = output[0];
-      importLoop: for (let { n: importee, ss: start, se: end } of imports) {
-        const importString = source.substring(start, end);
+      const { imports, facade, hasModuleSyntax } = getModuleInfo(filename, source);
+      importLoop: for (let { n: importee, isDynamic, isTypeOnly } of imports) {
         if (!importee) continue;
-        if (!includeTypeOnlyImports && isTypeOnlyImport(importString)) continue;
+        if (!includeTypeOnlyImports && isTypeOnly) continue;
         const isVirtualModule = virtualModules.some((match) => match(/** @type {string} */(importee)));
-        if (ignoreDynamicImport && importString.startsWith('import(')) continue;
+        if (ignoreDynamicImport && isDynamic) continue;
         if (!foreignModules.some((match) => match(/** @type {string} */(importee))) && !isVirtualModule) {
           if (isBareModuleSpecifier(importee) && external.ignore) continue;
           if (isBareModuleSpecifier(importee) && external.exclude?.length && external.exclude?.includes(extractPackageNameFromSpecifier(importee))) continue;

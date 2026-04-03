@@ -1,6 +1,6 @@
 # Module graph
 
-Creates a module graph based on a given entrypoint. Supports ESM, monorepos, import attributes, typescript, and is extensible via plugins. Builds on top of [`rs-module-lexer`](https://www.npmjs.com/package/rs-module-lexer) for scanning a module's imports, and [`oxc-resolver`](https://www.npmjs.com/package/oxc-resolver) for module resolution.
+Creates a module graph based on a given entrypoint. Supports ESM, monorepos, import attributes, typescript, and is extensible via plugins. Builds on top of [`oxc-parser`](https://www.npmjs.com/package/oxc-parser) for import/export scanning, and [`oxc-resolver`](https://www.npmjs.com/package/oxc-resolver) for module resolution.
 
 ## Installation
 
@@ -61,7 +61,7 @@ const moduleGraph = await createModuleGraph('./index.js', {
 
 `createModuleGraph` analyzes only ESM-style imports, not `require`. However, if a CommonJS file is found and uses a dynamic import, it will include the dynamic import in the graph and any other imports that leads to.
 
-By default, `import type` statements are skipped so type-only packages without a runtime entrypoint do not produce noisy resolution failures. Set `includeTypeOnlyImports: true` if you want those edges included in the graph. When this option is enabled and you did not explicitly choose a lexer, `createModuleGraph` switches to `es-module-lexer` because the default Rust lexer does not currently emit pure type-only imports.
+By default, `import type` statements and `export type ... from` edges are skipped so type-only packages without a runtime entrypoint do not produce noisy resolution failures. Set `includeTypeOnlyImports: true` if you want those edges included in the graph.
 
 ## CLI
 
