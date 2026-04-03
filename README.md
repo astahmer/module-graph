@@ -41,7 +41,7 @@ const moduleGraph = await createModuleGraph('./index.js', {
     /** Exclude bare module specifiers */
     exclude: ['foo', '@foo/bar'],
   },
-  /** Picomatch glob pattern or callback */
+  /** Glob pattern or callback. String patterns are matched via @rollup/pluginutils/createFilter. */
   exclude: [
     '**/ignore.js',
     '**/foo/*.js',
@@ -49,11 +49,11 @@ const moduleGraph = await createModuleGraph('./index.js', {
   ],
   /** Ignores dynamic imports */
   ignoreDynamicImport: true,
-  /** Picomatch glob patterns or callbacks for modules that should not be parsed because
+  /** Glob patterns or callbacks for modules that should not be parsed because
    * they do on exist or are not using valid js/ts/jsx/tsx syntax
    */
   foreignModules: ['**/*.css', 'virtual:*'],
-  /** Picomatch glob patterns or callbacks for imports that may not be tied to physical file */
+  /** Glob patterns or callbacks for imports that may not be tied to physical file */
   virtualModules: ['virtual:*'],
   plugins: [myPlugin]
 });

@@ -2,13 +2,11 @@ import fs from "fs";
 import path from "path";
 import { pathToFileURL, fileURLToPath } from "url";
 import { builtinModules } from "module";
+import { createFilter, normalizePath } from '@rollup/pluginutils';
 import { parseSync } from 'oxc-parser';
 import { ResolverFactory } from 'oxc-resolver';
 import { ModuleGraph } from "./ModuleGraph.js";
 import { extractPackageNameFromSpecifier, isBareModuleSpecifier, isScopedPackage, toUnix } from "./utils.js";
-import * as pm from 'picomatch';
-
-const picomatch = pm.default;
 
 const DEFAULT_EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.mts', '.cts', '.json', '.node'];
 const DEFAULT_EXTENSION_ALIAS = {
@@ -16,6 +14,22 @@ const DEFAULT_EXTENSION_ALIAS = {
   '.jsx': ['.jsx', '.tsx', '.ts', '.js'],
   '.mjs': ['.mjs', '.mts'],
   '.cjs': ['.cjs', '.cts'],
+};
+
+/**
+ * @param {Array<string | ((id: string) => boolean)>} patterns
+ */
+const createPathMatcher = (patterns) => {
+  const callbacks = /** @type {Array<(id: string) => boolean>} */ (
+    patterns.filter((pattern) => typeof pattern === 'function')
+  );
+  const globs = /** @type {string[]} */ (
+    patterns.filter((pattern) => typeof pattern === 'string')
+  );
+  const globFilter = globs.length > 0 ? createFilter(globs, null, { resolve: false }) : () => false;
+
+  /** @param {string} id */
+  return (id) => globFilter(normalizePath(id)) || callbacks.some((match) => match(id));
 };
 
 /**
@@ -63,13 +77,9 @@ export async function createModuleGraph(entrypoints, options = {}) {
   if (external.ignore && external.include?.length) {
     throw new Error('Cannot use both "ignore" and "include" in the external option.');
   }
-  const exclude = excludePatterns.map(p => typeof p === 'string' ? picomatch(p) : p);
-  const foreignModules = foreignModulePatterns.map((p) =>
-    typeof p === 'string' ? picomatch(p) : p
-  );
-  const virtualModules = virtualModulePatterns.map((p) =>
-    typeof p === 'string' ? picomatch(p) : p
-  );
+  const isExcluded = createPathMatcher(excludePatterns);
+  const isForeignModule = createPathMatcher(foreignModulePatterns);
+  const isVirtualModule = createPathMatcher(virtualModulePatterns);
 
   const effectiveResolveOptions = {
     ...resolveOptions,
@@ -242,9 +252,9 @@ export async function createModuleGraph(entrypoints, options = {}) {
       importLoop: for (let { n: importee, isDynamic, isTypeOnly } of imports) {
         if (!importee) continue;
         if (!includeTypeOnlyImports && isTypeOnly) continue;
-        const isVirtualModule = virtualModules.some((match) => match(/** @type {string} */(importee)));
+        const isVirtualImport = isVirtualModule(/** @type {string} */(importee));
         if (ignoreDynamicImport && isDynamic) continue;
-        if (!foreignModules.some((match) => match(/** @type {string} */(importee))) && !isVirtualModule) {
+        if (!isForeignModule(/** @type {string} */(importee)) && !isVirtualImport) {
           if (isBareModuleSpecifier(importee) && external.ignore) continue;
           if (isBareModuleSpecifier(importee) && external.exclude?.length && external.exclude?.includes(extractPackageNameFromSpecifier(importee))) continue;
           if (isBareModuleSpecifier(importee) && external.include?.length && !external.include?.includes(extractPackageNameFromSpecifier(importee))) continue;
@@ -283,7 +293,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
          * [PLUGINS] - resolve
          */
         let resolvedURL;
-        if (isVirtualModule) {
+        if (isVirtualImport) {
           resolvedURL = importee;
         }
         for (const { name, resolve } of plugins) {
@@ -318,7 +328,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
             continue;
           }
         }
-        const pathToDependency = isVirtualModule
+        const pathToDependency = isVirtualImport
           ? importee
           : toUnix(path.relative(basePath, fileURLToPath(resolvedURL)));
 
@@ -326,7 +336,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
          * Handle excludes, we do this here, because we want the resolved file paths, like
          * `node_modules/foo/index.js` to be excluded, not the importee, which would just be `foo`
          */
-        if (exclude.some(match => match(/** @type {string} */(pathToDependency)))) {
+        if (isExcluded(/** @type {string} */(pathToDependency))) {
           continue;
         }
 
@@ -364,9 +374,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
           path: toRelative(pathToDependency),
           importedBy: [],
           facade: false,
-          hasModuleSyntax: !foreignModules.some((match) =>
-            match(/** @type {string} */(pathToDependency))
-          ),
+          hasModuleSyntax: !isForeignModule(/** @type {string} */(pathToDependency)),
           source: '',
           ...(packageRoot ? { packageRoot } : {}),
         }
@@ -380,9 +388,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
         }
 
         if (
-          !foreignModules.some((match) =>
-            match(/** @type {string} */(pathToDependency))
-          ) &&
+          !isForeignModule(/** @type {string} */(pathToDependency)) &&
           !moduleGraph.graph.has(pathToDependency)
         ) {
           importsToScan.add(pathToDependency);

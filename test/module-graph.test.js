@@ -507,6 +507,15 @@ describe('plugins', () => {
 
     assert.deepStrictEqual(moduleGraph.getUniqueModules(), ["index.js", "foo.js", "bar.js", "node_modules/qux/index.js"]);
   });
+
+  it('exclude callback', async () => {
+    const moduleGraph = await createModuleGraph('./index.js', {
+      basePath: fixture('exclude'),
+      exclude: [(importee) => importee.endsWith('ignore.js') || importee.endsWith('ignore-me.js') || importee.includes('/quux/')],
+    });
+
+    assert.deepStrictEqual(moduleGraph.getUniqueModules(), ["index.js", "foo.js", "bar.js", "node_modules/qux/index.js"]);
+  });
 });
 
 describe('built-in plugins', () => {
