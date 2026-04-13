@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { program } from "commander";
 import { createModuleGraph } from "../index.js";
 
@@ -19,9 +20,26 @@ function parseEntrypoints(entrypoint: string): string[] {
     .map(ensureRelative);
 }
 
-const packageJson = JSON.parse(
-  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
-) as { version: string };
+export function readPackageVersion(moduleUrl: string | URL = import.meta.url): string {
+  for (const candidate of ["../package.json", "../../package.json"]) {
+    try {
+      const packageJson = JSON.parse(readFileSync(new URL(candidate, moduleUrl), "utf8")) as {
+        version: string;
+      };
+
+      return packageJson.version;
+    } catch (error) {
+      const errorWithCode = error as NodeJS.ErrnoException;
+      if (errorWithCode.code !== "ENOENT") {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error("Unable to locate package.json for CLI version lookup.");
+}
+
+const packageJson = { version: readPackageVersion() };
 
 program
   .name("module-graph")
@@ -65,4 +83,6 @@ program.argument("<entrypoint>", "Entrypoint").action(async (entrypoint: string)
   }
 });
 
-program.parse(process.argv);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await program.parseAsync(process.argv);
+}

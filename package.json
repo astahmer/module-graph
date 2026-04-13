@@ -5,47 +5,36 @@
   "keywords": [],
   "license": "ISC",
   "author": "",
-  "bin": "./bin/index.js",
+  "bin": "./dist/bin/index.js",
   "files": [
     "README.md",
-    "index.js",
-    "index.d.ts",
-    "ModuleGraph.js",
-    "ModuleGraph.d.ts",
-    "utils.js",
-    "utils.d.ts",
-    "types.js",
-    "types.d.ts",
-    "bin/index.js",
-    "bin/index.d.ts",
-    "plugins/*.js",
-    "plugins/*.d.ts"
+    "dist"
   ],
   "type": "module",
-  "types": "./index.d.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./index.d.ts",
-      "default": "./index.js"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./ModuleGraph.js": {
-      "types": "./ModuleGraph.d.ts",
-      "default": "./ModuleGraph.js"
+      "types": "./dist/ModuleGraph.d.ts",
+      "default": "./dist/ModuleGraph.js"
     },
     "./utils.js": {
-      "types": "./utils.d.ts",
-      "default": "./utils.js"
+      "types": "./dist/utils.d.ts",
+      "default": "./dist/utils.js"
     },
     "./plugins/*.js": {
-      "types": "./plugins/*.d.ts",
-      "default": "./plugins/*.js"
+      "types": "./dist/plugins/*.d.ts",
+      "default": "./dist/plugins/*.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "clean": "node -e \"const fs=require('node:fs');const path=require('node:path');const remove=(file)=>fs.rmSync(file,{force:true});for(const file of fs.readdirSync('.')){if(/^(?:index|ModuleGraph|utils|types)(?:2)?\\.(?:js|d\\.ts|mjs|d\\.mts)$/.test(file)) remove(file);}for(const file of ['index.js','index.d.ts']) remove(path.join('bin', file));for(const file of fs.readdirSync('plugins')){if(/^(?:barrel-file|exports|imports|unused-exports)(?:2)?\\.(?:js|d\\.ts|mjs|d\\.mts)$/.test(file)) remove(path.join('plugins', file));}\"",
+    "clean": "node -e \"const fs=require('node:fs');const path=require('node:path');const remove=(file)=>fs.rmSync(file,{recursive:true,force:true});remove('dist');for(const file of fs.readdirSync('.')){if(/^(?:index|ModuleGraph|utils|types)(?:2)?\\.(?:js|d\\.ts|mjs|d\\.mts)$/.test(file)) remove(file);}for(const file of ['index.js','index.d.ts']) remove(path.join('bin', file));for(const file of fs.readdirSync('plugins')){if(/^(?:barrel-file|exports|imports|unused-exports)(?:2)?\\.(?:js|d\\.ts|mjs|d\\.mts)$/.test(file)) remove(path.join('plugins', file));}\"",
     "build": "pnpm clean && tsdown",
     "build:watch": "pnpm clean && tsdown --watch",
     "test": "tsx --test --experimental-test-coverage test/module-graph.test.ts",

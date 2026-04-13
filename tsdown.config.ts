@@ -12,11 +12,11 @@ export default defineConfig({
     "plugins/unused-exports": "./plugins/unused-exports.ts",
     "bin/index": "./bin/index.ts",
   },
-  outDir: ".",
+  outDir: "./dist",
   format: ["esm"],
   unbundle: true,
   dts: true,
-  clean: false,
+  clean: true,
   outExtensions: () => ({
     js: ".js",
     dts: ".d.ts",

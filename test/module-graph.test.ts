@@ -1,8 +1,11 @@
 import assert from "node:assert";
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
 import { moduleResolve } from "import-meta-resolve";
+import { readPackageVersion } from "../bin/index.ts";
 import { createModuleGraph } from "../index.ts";
 import { unusedExports } from "../plugins/unused-exports.ts";
 import type { Export } from "../plugins/unused-exports.ts";
@@ -27,6 +30,44 @@ describe("utils", () => {
   it("extractPackageNameFromSpecifier", () => {
     assert.equal(extractPackageNameFromSpecifier("foo/bar/baz.js"), "foo");
     assert.equal(extractPackageNameFromSpecifier("@foo/bar/baz.js"), "@foo/bar");
+  });
+});
+
+describe("CLI", () => {
+  it("reads package version from source and dist paths", () => {
+    const packageJson = JSON.parse(
+      readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
+    ) as { version: string };
+
+    const sourceUrl = pathToFileURL(path.join(process.cwd(), "bin", "index.ts"));
+    const distUrl = pathToFileURL(path.join(process.cwd(), "dist", "bin", "index.js"));
+
+    assert.equal(readPackageVersion(sourceUrl), packageJson.version);
+    assert.equal(readPackageVersion(distUrl), packageJson.version);
+  });
+
+  it("outputs import chains", () => {
+    const result = spawnSync(
+      "pnpm",
+      [
+        "exec",
+        "tsx",
+        "bin/index.ts",
+        "import-chain",
+        "test/fixtures/graph-simple/index.js",
+        "test/fixtures/graph-simple/baz.js",
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: "utf8",
+      },
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(
+      result.stdout,
+      /Chain 1:\s+test\/fixtures\/graph-simple\/index\.js\s+test\/fixtures\/graph-simple\/bar\.js\s+test\/fixtures\/graph-simple\/baz\.js/s,
+    );
   });
 });
 
