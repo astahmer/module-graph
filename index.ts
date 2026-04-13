@@ -5,14 +5,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createFilter, normalizePath } from "@rollup/pluginutils";
 import { parseSync } from "oxc-parser";
 import { ResolverFactory } from "oxc-resolver";
-import { ModuleGraph } from "./ModuleGraph.js";
-import type { CreateModuleGraphOptions, Module, PathMatcherPattern, Plugin } from "./types.js";
+import { ModuleGraph } from "./ModuleGraph.ts";
+import type { CreateModuleGraphOptions, Module, PathMatcherPattern, Plugin } from "./types.ts";
 import {
   extractPackageNameFromSpecifier,
   isBareModuleSpecifier,
   isScopedPackage,
   toUnix,
-} from "./utils.js";
+} from "./utils.ts";
 
 const DEFAULT_EXTENSIONS = [
   ".js",

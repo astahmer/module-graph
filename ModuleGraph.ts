@@ -1,7 +1,7 @@
 import path from "node:path";
 import * as picomatchModule from "picomatch";
-import type { ExternalModule, Module } from "./types.js";
-import { toUnix } from "./utils.js";
+import type { ExternalModule, Module } from "./types.ts";
+import { toUnix } from "./utils.ts";
 
 type ModuleMatcher = string | ((modulePath: string) => boolean);
 type PicomatchFactory = ((pattern: string) => (value: string) => boolean) & {
@@ -15,7 +15,7 @@ const picomatch = ("default" in picomatchModule
 export class ModuleGraph {
   graph = new Map<string, Set<string>>();
 
-  private exactImportChainsCache = new Map<string, string[][]>();
+  private exactImportChainsIndex?: Map<string, string[][]>;
 
   private reverseGraphCache?: Map<string, string[]>;
 
@@ -113,52 +113,45 @@ export class ModuleGraph {
     return !isGlob && this.getKnownModulePaths().has(targetModule);
   }
 
-  private findExactImportChains(targetModule: string): string[][] {
-    const cachedChains = this.exactImportChainsCache.get(targetModule);
-    if (cachedChains) {
-      return cachedChains;
+  private getExactImportChainsIndex(): Map<string, string[][]> {
+    if (this.exactImportChainsIndex) {
+      return this.exactImportChainsIndex;
     }
 
-    const reverseGraph = this.getReverseGraph();
-    const inProgress = new Set<string>();
+    const chainsByModule = new Map<string, string[][]>();
 
-    const buildChains = (modulePath: string): string[][] => {
-      const memoizedChains = this.exactImportChainsCache.get(modulePath);
-      if (memoizedChains) {
-        return memoizedChains;
+    for (const modulePath of this.getKnownModulePaths()) {
+      chainsByModule.set(modulePath, []);
+    }
+
+    const dfs = (modulePath: string, chain: string[]): void => {
+      chainsByModule.get(modulePath)?.push(chain);
+
+      const dependencies = this.graph.get(modulePath);
+      if (!dependencies) {
+        return;
       }
 
-      if (inProgress.has(modulePath)) {
-        return [];
-      }
-
-      inProgress.add(modulePath);
-
-      const chains: string[][] = [];
-      for (const importer of reverseGraph.get(modulePath) ?? []) {
-        for (const importerChain of buildChains(importer)) {
-          if (!importerChain.includes(modulePath)) {
-            chains.push([...importerChain, modulePath]);
-          }
+      for (const dependency of dependencies) {
+        if (chain.includes(dependency)) {
+          continue;
         }
+
+        dfs(dependency, [...chain, dependency]);
       }
-
-      if (chains.length === 0 && this.relativeEntrypoints.includes(modulePath)) {
-        chains.push([modulePath]);
-      }
-
-      inProgress.delete(modulePath);
-      this.exactImportChainsCache.set(modulePath, chains);
-
-      return chains;
     };
 
-    return buildChains(targetModule);
+    for (const entrypoint of this.relativeEntrypoints) {
+      dfs(entrypoint, [entrypoint]);
+    }
+
+    this.exactImportChainsIndex = chainsByModule;
+    return chainsByModule;
   }
 
   findImportChains(targetModule: ModuleMatcher): string[][] {
     if (typeof targetModule === "string" && this.isExactModuleTarget(targetModule)) {
-      return this.findExactImportChains(targetModule);
+      return this.getExactImportChainsIndex().get(targetModule) ?? [];
     }
 
     const chains: string[][] = [];

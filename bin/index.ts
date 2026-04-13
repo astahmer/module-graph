@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { program } from "commander";
-import { createModuleGraph } from "../index.js";
+import { createModuleGraph } from "../index.ts";
 
 function ensureRelative(filePath: string): string {
   if (!filePath.startsWith("./") && !filePath.startsWith("../")) {

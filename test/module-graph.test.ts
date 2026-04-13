@@ -40,6 +40,41 @@ function createLinearModuleGraph(length: number): ModuleGraph {
   return moduleGraph;
 }
 
+function createCyclicImportChainGraph(): ModuleGraph {
+  const moduleGraph = new ModuleGraph(process.cwd(), ["entry"]);
+  const edges = new Map<string, string[]>([
+    ["entry", ["a"]],
+    ["a", ["b"]],
+    ["b", ["c", "target"]],
+    ["c", ["a", "target"]],
+    ["target", []],
+  ]);
+
+  for (const [modulePath, dependencies] of edges) {
+    moduleGraph.graph.set(modulePath, new Set(dependencies));
+    moduleGraph.modules.set(modulePath, {
+      href: "",
+      pathname: modulePath,
+      path: modulePath,
+      source: "",
+      facade: false,
+      hasModuleSyntax: true,
+      importedBy: [],
+    });
+  }
+
+  for (const [modulePath, dependencies] of edges) {
+    for (const dependency of dependencies) {
+      const importedModule = moduleGraph.modules.get(dependency);
+      if (importedModule) {
+        importedModule.importedBy.push(modulePath);
+      }
+    }
+  }
+
+  return moduleGraph;
+}
+
 describe("utils", () => {
   it("isBareModuleSpecifier", () => {
     assert(isBareModuleSpecifier("foo"));
@@ -257,6 +292,19 @@ describe("createModuleGraph", () => {
       repeatedLookupDuration < singleLookupDuration * 20,
       `Expected repeated exact lookups to stay near the cost of a single deep lookup, but ${repeatedLookupDuration.toFixed(2)}ms was too high versus ${singleLookupDuration.toFixed(2)}ms.`,
     );
+  });
+
+  it("matches exact and callback chains through cycles", () => {
+    const moduleGraph = createCyclicImportChainGraph();
+
+    const exactChains = moduleGraph.findImportChains("target");
+    const callbackChains = moduleGraph.findImportChains((modulePath) => modulePath === "target");
+
+    assert.deepStrictEqual(exactChains, callbackChains);
+    assert.deepStrictEqual(exactChains, [
+      ["entry", "a", "b", "c", "target"],
+      ["entry", "a", "b", "target"],
+    ]);
   });
 
   it("resolves-private", async () => {
