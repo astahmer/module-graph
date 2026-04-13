@@ -5,11 +5,11 @@
 Maybe something like:
 
 ```js
-{ 
-  'external-pkg': { 
-    '1.0.0': 'node_modules/external-pkg', 
+{
+  'external-pkg': {
+    '1.0.0': 'node_modules/external-pkg',
     '2.0.0': 'node_modules/foo/node_modules/external-pkg'
-  } 
+  }
 }
 ```
 
@@ -19,12 +19,12 @@ Add `findAll` method
 
 ```js
 // Gets passed `Module`
-moduleGraph.findAll(({packageRoot, path, pathname, importedBy}) => {
+moduleGraph.findAll(({ packageRoot, path, pathname, importedBy }) => {
   if (!!packageRoot) {
     return true;
   }
 
-  if(importedBy.length > 5) {
+  if (importedBy.length > 5) {
     return true;
   }
 });
@@ -33,4 +33,4 @@ moduleGraph.findAll(({packageRoot, path, pathname, importedBy}) => {
 ## `externalOnly`
 
 foo -> bar -> baz
-         \_ qux
+\_ qux

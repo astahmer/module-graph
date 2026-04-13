@@ -1,74 +1,76 @@
 # Module graph
 
-Creates a module graph based on a given entrypoint. Supports ESM, monorepos, import attributes, typescript, and is extensible via plugins. Builds on top of [`rs-module-lexer`](https://www.npmjs.com/package/rs-module-lexer) for scanning a module's imports, and [`oxc-resolver`](https://www.npmjs.com/package/oxc-resolver) for module resolution.
+Creates a module graph based on a given entrypoint. Supports ESM, monorepos, import attributes, typescript, and is extensible via plugins. Builds on top of [`oxc-parser`](https://www.npmjs.com/package/oxc-parser) for import/export scanning, and [`oxc-resolver`](https://www.npmjs.com/package/oxc-resolver) for module resolution.
 
 ## Installation
 
 ```
-npm i @thepassle/module-graph
+pnpm add @astahmer/module-graph
 ```
 
 ## Usage
 
 ```js
-import { createModuleGraph } from '@thepassle/module-graph';
+import { createModuleGraph } from "@astahmer/module-graph";
 
-const moduleGraph = await createModuleGraph('./index.js');
+const moduleGraph = await createModuleGraph("./index.js");
 
 /**
  * Multiple entrypoints
  */
-const moduleGraph = await createModuleGraph(['./foo.js', './bar.js']);
+const moduleGraph = await createModuleGraph(["./foo.js", "./bar.js"]);
 
 /**
  * Configuration options
  * Supports all `oxc-resolver`'s `NapiResolveOptions` options.
  * https://github.com/oxc-project/oxc-resolver?tab=readme-ov-file#oxc-resolver
  */
-const moduleGraph = await createModuleGraph('./index.js', {
+const moduleGraph = await createModuleGraph("./index.js", {
   basePath: process.cwd(),
-  exportConditions: ['browser', 'import'],
+  exportConditions: ["browser", "import"],
+  /** Include `import type` edges in the graph. Defaults to false. */
+  includeTypeOnlyImports: true,
+  /** Defaults to JS/TS-aware resolution: .js, .jsx, .ts, .tsx, .mjs, .cjs, .mts, .cts, .json, .node */
+  extensions: [".js", ".jsx", ".ts", ".tsx", ".json"],
   /** Handle external modules */
   external: {
     /** Ignore all external modules imported via a bare module specifier */
     ignore: true,
     /** Only include external modules from these packages */
-    include: ['bar'],
+    include: ["bar"],
     /** Exclude bare module specifiers */
-    exclude: ['foo', '@foo/bar'],
+    exclude: ["foo", "@foo/bar"],
   },
-  /** Picomatch glob pattern or callback */
-  exclude: [
-    '**/ignore.js',
-    '**/foo/*.js',
-    (importee) => importee.includes('foo')
-  ],
+  /** Glob pattern or callback. String patterns are matched via @rollup/pluginutils/createFilter. */
+  exclude: ["**/ignore.js", "**/foo/*.js", (importee) => importee.includes("foo")],
   /** Ignores dynamic imports */
   ignoreDynamicImport: true,
-  /** Picomatch glob patterns or callbacks for modules that should not be parsed because
+  /** Glob patterns or callbacks for modules that should not be parsed because
    * they do on exist or are not using valid js/ts/jsx/tsx syntax
    */
-  foreignModules: ['**/*.css', 'virtual:*'],
-  /** Picomatch glob patterns or callbacks for imports that may not be tied to physical file */
-  virtualModules: ['virtual:*'],
-  plugins: [myPlugin]
+  foreignModules: ["**/*.css", "virtual:*"],
+  /** Glob patterns or callbacks for imports that may not be tied to physical file */
+  virtualModules: ["virtual:*"],
+  plugins: [myPlugin],
 });
 ```
 
 `createModuleGraph` analyzes only ESM-style imports, not `require`. However, if a CommonJS file is found and uses a dynamic import, it will include the dynamic import in the graph and any other imports that leads to.
 
+By default, `import type` statements and `export type ... from` edges are skipped so type-only packages without a runtime entrypoint do not produce noisy resolution failures. Set `includeTypeOnlyImports: true` if you want those edges included in the graph.
+
 ## CLI
 
 ```bash
 # List all modules in the graph
-npx @thepassle/module-graph index.js
-npx @thepassle/module-graph foo.js,bar.js
+pnpm dlx @astahmer/module-graph index.js
+pnpm dlx @astahmer/module-graph foo.js,bar.js
 
 # Find import chains for a given module
-npx @thepassle/module-graph import-chain entrypoint.js module-to-find.js
+pnpm dlx @astahmer/module-graph import-chain entrypoint.js module-to-find.js
 
 # Find specific module
-npx @thepassle/module-graph find entrypoint.js module-to-find.js
+pnpm dlx @astahmer/module-graph find entrypoint.js module-to-find.js
 ```
 
 ## `ModuleGraph`
@@ -76,22 +78,22 @@ npx @thepassle/module-graph find entrypoint.js module-to-find.js
 ### `get`
 
 ```js
-const moduleGraph = await createModuleGraph('./index.js');
+const moduleGraph = await createModuleGraph("./index.js");
 
-const foo = moduleGraph.get('foo.js');
+const foo = moduleGraph.get("foo.js");
 /** Or use picomatch pattern */
-const bar = moduleGraph.get('**/bar.js');
+const bar = moduleGraph.get("**/bar.js");
 
 /**
  * Or:
  */
-const foo = moduleGraph.get((p) => p.endsWith('foo.js'));
+const foo = moduleGraph.get((p) => p.endsWith("foo.js"));
 ```
 
 ### `getUniqueModules`
 
 ```js
-const moduleGraph = await createModuleGraph('./index.js');
+const moduleGraph = await createModuleGraph("./index.js");
 
 const uniqueModules = moduleGraph.getUniqueModules();
 ```
@@ -99,14 +101,15 @@ const uniqueModules = moduleGraph.getUniqueModules();
 ### `findImportChains`
 
 ```js
-const moduleGraph = await createModuleGraph('./index.js');
+const moduleGraph = await createModuleGraph("./index.js");
 
-const chains = moduleGraph.findImportChains('baz.js');
+const chains = moduleGraph.findImportChains("baz.js");
+const cappedChains = moduleGraph.findImportChains("baz.js", { maxChains: 5 });
 
 /**
  * Or:
  */
-const chains = moduleGraph.findImportChains((p) => p.endsWith('baz.js'));
+const chains = moduleGraph.findImportChains((p) => p.endsWith("baz.js"));
 
 chains.forEach((c) => console.log(c.join(" -> ")));
 // index.js -> bar.js -> baz.js
@@ -122,23 +125,23 @@ You can also extend the default behavior by providing plugins. There are several
 - **Unused-exports** finds unused exports in your module graph
 
 ```js
-import { imports } from '@thepassle/module-graph/plugins/imports.js';
-import { exports } from '@thepassle/module-graph/plugins/exports.js';
-import { barrelFile } from '@thepassle/module-graph/plugins/barrel-file.js';
-import { unusedExports } from '@thepassle/module-graph/plugins/unused-exports.js';
+import { imports } from "@astahmer/module-graph/plugins/imports.js";
+import { exports } from "@astahmer/module-graph/plugins/exports.js";
+import { barrelFile } from "@astahmer/module-graph/plugins/barrel-file.js";
+import { unusedExports } from "@astahmer/module-graph/plugins/unused-exports.js";
 
-const moduleGraph = await createModuleGraph('./index.js', {
+const moduleGraph = await createModuleGraph("./index.js", {
   plugins: [
     imports,
     exports,
     unusedExports,
     barrelFile({
-      amountOfExportsToConsiderModuleAsBarrel: 3
-    })
-  ]
+      amountOfExportsToConsiderModuleAsBarrel: 3,
+    }),
+  ],
 });
 
-const module = moduleGraph.get('index.js');
+const module = moduleGraph.get("index.js");
 
 module.imports; // Array of `Import`
 module.exports; // Array of `Export`
@@ -162,14 +165,14 @@ Use for initializing logic of the plugin
 
 ```js
 const plugin = {
-  name: 'my-plugin',
-  start: ({entrypoints, basePath, exportConditions}) => {
-    console.log('Plugin start');
-  }
-}
+  name: "my-plugin",
+  start: ({ entrypoints, basePath, exportConditions }) => {
+    console.log("Plugin start");
+  },
+};
 
-const moduleGraph = await createModuleGraph('./index.js', {
-  plugins: [plugin]
+const moduleGraph = await createModuleGraph("./index.js", {
+  plugins: [plugin],
 });
 ```
 
@@ -181,16 +184,16 @@ Can be used to extract JS from non-js files, like Vue or Svelte files.
 
 ```js
 const plugin = {
-  name: 'my-plugin',
+  name: "my-plugin",
   transformSource: ({ source }) => {
     const match = source.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
     const result = match ? match[1].trim() : null;
     return result;
-  }
-}
+  },
+};
 
-const moduleGraph = await createModuleGraph('./App.html', {
-  plugins: [plugin]
+const moduleGraph = await createModuleGraph("./App.html", {
+  plugins: [plugin],
 });
 ```
 
@@ -205,16 +208,16 @@ Can be used to implement custom logic or rewrite a specifier
 
 ```js
 const plugin = {
-  name: 'my-plugin',
-  handleImport: ({source, importer, importee}) => {
-    if (importee.endsWith('?skip')) {
+  name: "my-plugin",
+  handleImport: ({ source, importer, importee }) => {
+    if (importee.endsWith("?skip")) {
       return false;
     }
-  }
-}
+  },
+};
 
-const moduleGraph = await createModuleGraph('./index.js', {
-  plugins: [plugin]
+const moduleGraph = await createModuleGraph("./index.js", {
+  plugins: [plugin],
 });
 ```
 
@@ -228,19 +231,19 @@ You can mutate the module directly, no need to return it
 
 ```js
 const plugin = {
-  name: 'my-plugin',
+  name: "my-plugin",
   analyze: (module) => {
-    if (module.source.includes('process.env')) {
+    if (module.source.includes("process.env")) {
       module.usesProcessEnv = true;
     }
-  }
-}
+  },
+};
 
-const moduleGraph = await createModuleGraph('./index.js', {
-  plugins: [plugin]
+const moduleGraph = await createModuleGraph("./index.js", {
+  plugins: [plugin],
 });
 
-moduleGraph.get('module-containing-process-env.js').usesProcessEnv; // true
+moduleGraph.get("module-containing-process-env.js").usesProcessEnv; // true
 ```
 
 #### `resolve`
@@ -254,14 +257,14 @@ Can be used to implement custom resolution logic. Gets passed the `resolveOption
 
 ```js
 const plugin = {
-  name: 'my-plugin',
+  name: "my-plugin",
   resolve: ({ importee, importer, exportConditions, ...resolveOptions }) => {
     return customResolve(importee, importer, exportConditions);
-  }
-}
+  },
+};
 
-const moduleGraph = await createModuleGraph('./index.js', {
-  plugins: [plugin]
+const moduleGraph = await createModuleGraph("./index.js", {
+  plugins: [plugin],
 });
 ```
 
@@ -273,15 +276,15 @@ Use for cleanup logic of the plugin
 
 ```js
 const plugin = {
-  name: 'my-plugin',
+  name: "my-plugin",
   end: (moduleGraph) => {
-    console.log('Plugin end')
-    moduleGraph.foo = 'bar';
-  }
-}
+    console.log("Plugin end");
+    moduleGraph.foo = "bar";
+  },
+};
 
-const moduleGraph = await createModuleGraph('./index.js', {
-  plugins: [plugin]
+const moduleGraph = await createModuleGraph("./index.js", {
+  plugins: [plugin],
 });
 
 moduleGraph.foo; // 'bar'
@@ -293,23 +296,23 @@ For example, if you want to create a graph visualization, you could create a `di
 
 ```js
 import { exportToFile } from "@ts-graphviz/node";
-import { createModuleGraph } from '@thepassle/module-graph';
+import { createModuleGraph } from "@thepassle/module-graph";
 
 const digraphPlugin = {
-  name: 'digraph-plugin',
+  name: "digraph-plugin",
   end(moduleGraph) {
-    let digraph = 'digraph {\n';
+    let digraph = "digraph {\n";
     for (const [parent, importees] of moduleGraph.graph) {
-      digraph += `  "${parent}" -> ${[...importees].map(p => `"${p}"`).join(',')}\n`;
+      digraph += `  "${parent}" -> ${[...importees].map((p) => `"${p}"`).join(",")}\n`;
     }
-    digraph += '}';
+    digraph += "}";
 
     moduleGraph.digraph = digraph;
-  }
-}
+  },
+};
 
-const moduleGraph = await createModuleGraph('./entrypoint.js', {
-  plugins: [digraphPlugin]
+const moduleGraph = await createModuleGraph("./entrypoint.js", {
+  plugins: [digraphPlugin],
 });
 
 await exportToFile(moduleGraph.digraph, {
@@ -317,3 +320,7 @@ await exportToFile(moduleGraph.digraph, {
   output: "./example.png",
 });
 ```
+
+## Fork
+
+This project is a fork of [thepassle/module-graph](https://github.com/thepassle/module-graph) with some changes to support the [modviz](https://github.com/astahmer/modviz) project.

@@ -1,0 +1,3 @@
+{
+  "ignorePatterns": ["dist/**", "modviz.json", "test/fixtures/**"]
+}

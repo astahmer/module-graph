@@ -1,63 +1,82 @@
 {
   "name": "@astahmer/module-graph",
+  "type": "module",
   "version": "0.14.1",
   "description": "Creates a module graph based on a given entrypoint.",
-  "bin": "./bin/index.js",
+  "keywords": [
+    "module",
+    "graph",
+    "cli",
+    "transitive",
+    "import",
+    "export",
+    "dependency",
+    "analysis"
+  ],
+  "license": "ISC",
+  "author": "Alexandre Stahmer",
+  "bin": "./dist/bin/index.js",
+  "files": [
+    "README.md",
+    "dist"
+  ],
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./module-graph.js": {
+      "types": "./dist/module-graph.d.ts",
+      "default": "./dist/module-graph.js"
+    },
+    "./ModuleGraph.js": {
+      "types": "./dist/module-graph.d.ts",
+      "default": "./dist/module-graph.js"
+    },
+    "./utils.js": {
+      "types": "./dist/utils.d.ts",
+      "default": "./dist/utils.js"
+    },
+    "./plugins/*.js": {
+      "types": "./dist/plugins/*.d.ts",
+      "default": "./dist/plugins/*.js"
+    }
+  },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "start": "node --watch index.js",
-    "test": "node --test --experimental-test-coverage test/module-graph.test.js",
-    "test:watch": "node --test --watch test/module-graph.test.js",
-    "lint:types": "tsc",
-    "lint:types:watch": "tsc --watch",
-    "prepublishOnly": "tsc"
-  },
-  "exports": {
-    ".": {
-      "types": "./dist-types/index.d.ts",
-      "default": "./index.js"
-    },
-    "./ModuleGraph.js": {
-      "types": "./dist-types/ModuleGraph.d.ts",
-      "default": "./ModuleGraph.js"
-    },
-    "./utils.js": {
-      "types": "./dist-types/utils.d.ts",
-      "default": "./utils.js"
-    },
-    "./plugins/*.js": {
-      "types": "./dist-types/plugins/*.d.ts",
-      "default": "./plugins/*.js"
-    }
-  },
-  "files": [
-    "README.md",
-    "dist-types",
-    "module-lexer",
-    "index.js",
-    "ModuleGraph.js",
-    "utils.js",
-    "plugins/*.js"
-  ],
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
-  "devDependencies": {
-    "@types/node": "^20.11.24",
-    "@types/picomatch": "^2.3.3",
-    "import-meta-resolve": "^4.0.0",
-    "typescript": "^5.3.3"
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "pnpm clean && tsdown",
+    "build:watch": "pnpm clean && tsdown --watch",
+    "test": "node --test --experimental-test-coverage test/module-graph.test.ts",
+    "test:watch": "node --test --watch test/module-graph.test.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint --fix .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "prepare": "lefthook install",
+    "prepack": "pnpm build"
   },
   "dependencies": {
-    "@rollup/plugin-typescript": "^11.1.6",
-    "@thepassle/module-utils": "^0.2.0",
-    "commander": "^12.0.0",
-    "es-module-lexer": "^1.7.0",
-    "oxc-resolver": "^1.9.3",
-    "picomatch": "^4.0.1",
-    "rs-module-lexer": "^2.5.1"
-  }
+    "@rollup/pluginutils": "5.3.0",
+    "@thepassle/module-utils": "0.4.0",
+    "commander": "14.0.3",
+    "oxc-parser": "0.125.0",
+    "oxc-resolver": "11.19.1",
+    "picomatch": "4.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "25.6.0",
+    "@types/picomatch": "4.0.3",
+    "import-meta-resolve": "4.2.0",
+    "lefthook": "2.1.5",
+    "oxfmt": "0.45.0",
+    "oxlint": "1.60.0",
+    "tsdown": "0.21.8",
+    "typescript": "6.0.2"
+  },
+  "packageManager": "pnpm@10.33.0"
 }
