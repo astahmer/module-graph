@@ -320,3 +320,7 @@ await exportToFile(moduleGraph.digraph, {
   output: "./example.png",
 });
 ```
+
+## Fork
+
+This project is a fork of [thepassle/module-graph](https://github.com/thepassle/module-graph) with some changes to support the [modviz](https://github.com/astahmer/modviz) project.

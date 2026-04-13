@@ -8,13 +8,8 @@
     "noImplicitThis": true,
     "alwaysStrict": true,
     "skipLibCheck": true,
-    "types": [
-      "node"
-    ],
+    "types": ["node"],
     "noEmit": true
   },
-  "include": [
-    "src/**/*.ts",
-    "test/module-graph.test.ts"
-  ]
+  "include": ["src/**/*.ts", "test/module-graph.test.ts"]
 }

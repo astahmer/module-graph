@@ -1,16 +1,25 @@
 {
   "name": "@astahmer/module-graph",
+  "type": "module",
   "version": "0.14.1",
   "description": "Creates a module graph based on a given entrypoint.",
-  "keywords": [],
+  "keywords": [
+    "module",
+    "graph",
+    "cli",
+    "transitive",
+    "import",
+    "export",
+    "dependency",
+    "analysis"
+  ],
   "license": "ISC",
-  "author": "",
+  "author": "Alexandre Stahmer",
   "bin": "./dist/bin/index.js",
   "files": [
     "README.md",
     "dist"
   ],
-  "type": "module",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
