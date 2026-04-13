@@ -6,16 +6,39 @@ import { describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
 import { moduleResolve } from "import-meta-resolve";
 import { readPackageVersion } from "../bin/index.ts";
+import { ModuleGraph } from "../ModuleGraph.ts";
 import { createModuleGraph } from "../index.ts";
 import { unusedExports } from "../plugins/unused-exports.ts";
 import type { Export } from "../plugins/unused-exports.ts";
-import type { ModuleGraph } from "../ModuleGraph.ts";
 import type { Plugin } from "../types.ts";
 import { extractPackageNameFromSpecifier, isBareModuleSpecifier } from "../utils.ts";
 
 const fixture = (value: string) => path.join(process.cwd(), "test/fixtures", value);
 type ModuleGraphWithFoo = ModuleGraph & { foo: string };
 type ModuleGraphWithUnusedExports = ModuleGraph & { unusedExports: Export[] };
+
+function createLinearModuleGraph(length: number): ModuleGraph {
+  const moduleGraph = new ModuleGraph(process.cwd(), ["entry-0"]);
+
+  for (let index = 0; index < length; index++) {
+    const modulePath = index === 0 ? "entry-0" : `node-${index}`;
+    const dependency = index < length - 1 ? `node-${index + 1}` : undefined;
+    const importer = index === 0 ? undefined : index === 1 ? "entry-0" : `node-${index - 1}`;
+
+    moduleGraph.graph.set(modulePath, new Set(dependency ? [dependency] : []));
+    moduleGraph.modules.set(modulePath, {
+      href: "",
+      pathname: modulePath,
+      path: modulePath,
+      source: "",
+      facade: false,
+      hasModuleSyntax: true,
+      importedBy: importer ? [importer] : [],
+    });
+  }
+
+  return moduleGraph;
+}
 
 describe("utils", () => {
   it("isBareModuleSpecifier", () => {
@@ -72,6 +95,14 @@ describe("CLI", () => {
 });
 
 describe("createModuleGraph", () => {
+  it("finds an exact entrypoint chain", async () => {
+    const moduleGraph = await createModuleGraph("./index.js", {
+      basePath: fixture("graph-simple"),
+    });
+
+    assert.deepStrictEqual(moduleGraph.findImportChains("index.js"), [["index.js"]]);
+  });
+
   it("graph-simple", async () => {
     const moduleGraph = await createModuleGraph("./index.js", {
       basePath: fixture("graph-simple"),
@@ -201,6 +232,31 @@ describe("createModuleGraph", () => {
     const [moduleC] = moduleGraph.get("c.js");
     assert(moduleC);
     assert.deepStrictEqual(moduleC.importedBy, ["b.js", "d.js"]);
+  });
+
+  it("reuses exact path traversals across repeated lookups", { timeout: 5000 }, () => {
+    const moduleGraph = createLinearModuleGraph(1000);
+    const deepestModule = "node-999";
+
+    const singleLookupStart = performance.now();
+    const deepestChains = moduleGraph.findImportChains(deepestModule);
+    const singleLookupDuration = performance.now() - singleLookupStart;
+
+    assert.equal(deepestChains.length, 1);
+    assert.equal(deepestChains[0]?.at(-1), deepestModule);
+
+    const repeatedLookupStart = performance.now();
+    for (const modulePath of moduleGraph.graph.keys()) {
+      const chains = moduleGraph.findImportChains(modulePath);
+      assert.equal(chains.length, 1);
+      assert.equal(chains[0]?.at(-1), modulePath);
+    }
+    const repeatedLookupDuration = performance.now() - repeatedLookupStart;
+
+    assert.ok(
+      repeatedLookupDuration < singleLookupDuration * 20,
+      `Expected repeated exact lookups to stay near the cost of a single deep lookup, but ${repeatedLookupDuration.toFixed(2)}ms was too high versus ${singleLookupDuration.toFixed(2)}ms.`,
+    );
   });
 
   it("resolves-private", async () => {
