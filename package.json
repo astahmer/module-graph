@@ -17,9 +17,13 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./module-graph.js": {
+      "types": "./dist/module-graph.d.ts",
+      "default": "./dist/module-graph.js"
+    },
     "./ModuleGraph.js": {
-      "types": "./dist/ModuleGraph.d.ts",
-      "default": "./dist/ModuleGraph.js"
+      "types": "./dist/module-graph.d.ts",
+      "default": "./dist/module-graph.js"
     },
     "./utils.js": {
       "types": "./dist/utils.d.ts",
@@ -34,11 +38,11 @@
     "access": "public"
   },
   "scripts": {
-    "clean": "node -e \"const fs=require('node:fs');const path=require('node:path');const remove=(file)=>fs.rmSync(file,{recursive:true,force:true});remove('dist');for(const file of fs.readdirSync('.')){if(/^(?:index|ModuleGraph|utils|types)(?:2)?\\.(?:js|d\\.ts|mjs|d\\.mts)$/.test(file)) remove(file);}for(const file of ['index.js','index.d.ts']) remove(path.join('bin', file));for(const file of fs.readdirSync('plugins')){if(/^(?:barrel-file|exports|imports|unused-exports)(?:2)?\\.(?:js|d\\.ts|mjs|d\\.mts)$/.test(file)) remove(path.join('plugins', file));}\"",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "pnpm clean && tsdown",
     "build:watch": "pnpm clean && tsdown --watch",
-    "test": "tsx --test --experimental-test-coverage test/module-graph.test.ts",
-    "test:watch": "tsx --test --watch test/module-graph.test.ts",
+    "test": "node --test --experimental-test-coverage test/module-graph.test.ts",
+    "test:watch": "node --test --watch test/module-graph.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint .",
     "lint:fix": "oxlint --fix .",
@@ -63,7 +67,6 @@
     "oxfmt": "0.45.0",
     "oxlint": "1.60.0",
     "tsdown": "0.21.8",
-    "tsx": "4.21.0",
     "typescript": "6.0.2"
   },
   "packageManager": "pnpm@10.33.0"

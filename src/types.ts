@@ -1,6 +1,6 @@
 import type { URL } from "node:url";
 import type { NapiResolveOptions } from "oxc-resolver";
-import type { ModuleGraph } from "./ModuleGraph.js";
+import type { ModuleGraph } from "./module-graph.js";
 
 interface UserProvided {
   [key: string]: any;
@@ -31,6 +31,10 @@ export interface ExternalModule extends Module {
 
 export type ExtendedModule<T extends UserProvided> = Module & T;
 export type ExtendedModuleGraph<T extends UserProvided> = ModuleGraph & T;
+
+export interface FindImportChainsOptions {
+  maxChains?: number;
+}
 
 export interface Plugin {
   name: string;

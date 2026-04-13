@@ -1,6 +1,6 @@
 import path from "node:path";
 import * as picomatchModule from "picomatch";
-import type { ExternalModule, Module } from "./types.ts";
+import type { ExternalModule, FindImportChainsOptions, Module } from "./types.ts";
 import { toUnix } from "./utils.ts";
 
 type ModuleMatcher = string | ((modulePath: string) => boolean);
@@ -15,7 +15,9 @@ const picomatch = ("default" in picomatchModule
 export class ModuleGraph {
   graph = new Map<string, Set<string>>();
 
-  private exactImportChainsIndex?: Map<string, string[][]>;
+  private exactImportChainsIndexes = new Map<number, Map<string, string[][]>>();
+
+  private knownModulePathsCache?: Set<string>;
 
   private reverseGraphCache?: Map<string, string[]>;
 
@@ -70,6 +72,10 @@ export class ModuleGraph {
   }
 
   private getKnownModulePaths(): Set<string> {
+    if (this.knownModulePathsCache) {
+      return this.knownModulePathsCache;
+    }
+
     const modulePaths = new Set<string>(this.relativeEntrypoints);
 
     for (const modulePath of this.modules.keys()) {
@@ -83,6 +89,7 @@ export class ModuleGraph {
       }
     }
 
+    this.knownModulePathsCache = modulePaths;
     return modulePaths;
   }
 
@@ -113,9 +120,22 @@ export class ModuleGraph {
     return !isGlob && this.getKnownModulePaths().has(targetModule);
   }
 
-  private getExactImportChainsIndex(): Map<string, string[][]> {
-    if (this.exactImportChainsIndex) {
-      return this.exactImportChainsIndex;
+  private normalizeMaxChains(maxChains?: number): number {
+    if (maxChains === undefined) {
+      return Number.POSITIVE_INFINITY;
+    }
+
+    if (!Number.isFinite(maxChains) || maxChains < 1) {
+      return 0;
+    }
+
+    return Math.floor(maxChains);
+  }
+
+  private getExactImportChainsIndex(maxChains: number): Map<string, string[][]> {
+    const cachedIndex = this.exactImportChainsIndexes.get(maxChains);
+    if (cachedIndex) {
+      return cachedIndex;
     }
 
     const chainsByModule = new Map<string, string[][]>();
@@ -125,7 +145,12 @@ export class ModuleGraph {
     }
 
     const dfs = (modulePath: string, chain: string[]): void => {
-      chainsByModule.get(modulePath)?.push(chain);
+      const moduleChains = chainsByModule.get(modulePath);
+      if (!moduleChains || moduleChains.length >= maxChains) {
+        return;
+      }
+
+      moduleChains.push(chain);
 
       const dependencies = this.graph.get(modulePath);
       if (!dependencies) {
@@ -145,13 +170,18 @@ export class ModuleGraph {
       dfs(entrypoint, [entrypoint]);
     }
 
-    this.exactImportChainsIndex = chainsByModule;
+    this.exactImportChainsIndexes.set(maxChains, chainsByModule);
     return chainsByModule;
   }
 
-  findImportChains(targetModule: ModuleMatcher): string[][] {
+  findImportChains(targetModule: ModuleMatcher, options: FindImportChainsOptions = {}): string[][] {
+    const maxChains = this.normalizeMaxChains(options.maxChains);
+    if (maxChains === 0) {
+      return [];
+    }
+
     if (typeof targetModule === "string" && this.isExactModuleTarget(targetModule)) {
-      return this.getExactImportChainsIndex().get(targetModule) ?? [];
+      return this.getExactImportChainsIndex(maxChains).get(targetModule) ?? [];
     }
 
     const chains: string[][] = [];
@@ -187,7 +217,7 @@ export class ModuleGraph {
     }
 
     const dfs = (modulePath: string, chain: string[]): void => {
-      if (!modulesThatCanReachTarget.has(modulePath)) {
+      if (chains.length >= maxChains || !modulesThatCanReachTarget.has(modulePath)) {
         return;
       }
 
@@ -207,10 +237,17 @@ export class ModuleGraph {
         }
 
         dfs(dependency, [...chain, dependency]);
+        if (chains.length >= maxChains) {
+          return;
+        }
       }
     };
 
     for (const entrypoint of this.relativeEntrypoints) {
+      if (chains.length >= maxChains) {
+        break;
+      }
+
       if (modulesThatCanReachTarget.has(entrypoint)) {
         dfs(entrypoint, [entrypoint]);
       }

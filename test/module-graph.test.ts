@@ -5,13 +5,13 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
 import { moduleResolve } from "import-meta-resolve";
-import { readPackageVersion } from "../bin/index.ts";
-import { ModuleGraph } from "../ModuleGraph.ts";
-import { createModuleGraph } from "../index.ts";
-import { unusedExports } from "../plugins/unused-exports.ts";
-import type { Export } from "../plugins/unused-exports.ts";
-import type { Plugin } from "../types.ts";
-import { extractPackageNameFromSpecifier, isBareModuleSpecifier } from "../utils.ts";
+import { readPackageVersion } from "../src/bin/index.ts";
+import { ModuleGraph } from "../src/module-graph.ts";
+import { createModuleGraph } from "../src/index.ts";
+import { unusedExports } from "../src/plugins/unused-exports.ts";
+import type { Export } from "../src/plugins/unused-exports.ts";
+import type { Plugin } from "../src/types.ts";
+import { extractPackageNameFromSpecifier, isBareModuleSpecifier } from "../src/utils.ts";
 
 const fixture = (value: string) => path.join(process.cwd(), "test/fixtures", value);
 type ModuleGraphWithFoo = ModuleGraph & { foo: string };
@@ -97,7 +97,7 @@ describe("CLI", () => {
       readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
     ) as { version: string };
 
-    const sourceUrl = pathToFileURL(path.join(process.cwd(), "bin", "index.ts"));
+    const sourceUrl = pathToFileURL(path.join(process.cwd(), "src", "bin", "index.ts"));
     const distUrl = pathToFileURL(path.join(process.cwd(), "dist", "bin", "index.js"));
 
     assert.equal(readPackageVersion(sourceUrl), packageJson.version);
@@ -106,11 +106,9 @@ describe("CLI", () => {
 
   it("outputs import chains", () => {
     const result = spawnSync(
-      "pnpm",
+      process.execPath,
       [
-        "exec",
-        "tsx",
-        "bin/index.ts",
+        path.join(process.cwd(), "src", "bin", "index.ts"),
         "import-chain",
         "test/fixtures/graph-simple/index.js",
         "test/fixtures/graph-simple/baz.js",
@@ -305,6 +303,27 @@ describe("createModuleGraph", () => {
       ["entry", "a", "b", "c", "target"],
       ["entry", "a", "b", "target"],
     ]);
+  });
+
+  it("caps exact import chains", async () => {
+    const moduleGraph = await createModuleGraph("./a.js", {
+      basePath: fixture("multiple-import-chains"),
+    });
+
+    assert.deepStrictEqual(moduleGraph.findImportChains("c.js", { maxChains: 1 }), [
+      ["a.js", "b.js", "c.js"],
+    ]);
+  });
+
+  it("caps callback import chains", async () => {
+    const moduleGraph = await createModuleGraph("./a.js", {
+      basePath: fixture("multiple-import-chains"),
+    });
+
+    assert.deepStrictEqual(
+      moduleGraph.findImportChains((modulePath) => modulePath === "c.js", { maxChains: 1 }),
+      [["a.js", "b.js", "c.js"]],
+    );
   });
 
   it("resolves-private", async () => {

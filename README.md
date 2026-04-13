@@ -104,6 +104,7 @@ const uniqueModules = moduleGraph.getUniqueModules();
 const moduleGraph = await createModuleGraph("./index.js");
 
 const chains = moduleGraph.findImportChains("baz.js");
+const cappedChains = moduleGraph.findImportChains("baz.js", { maxChains: 5 });
 
 /**
  * Or:

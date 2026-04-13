@@ -5,8 +5,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createFilter, normalizePath } from "@rollup/pluginutils";
 import { parseSync } from "oxc-parser";
 import { ResolverFactory } from "oxc-resolver";
-import { ModuleGraph } from "./ModuleGraph.ts";
-import type { CreateModuleGraphOptions, Module, PathMatcherPattern, Plugin } from "./types.ts";
+import { ModuleGraph } from "./module-graph.ts";
+import type {
+  CreateModuleGraphOptions,
+  FindImportChainsOptions,
+  Module,
+  PathMatcherPattern,
+  Plugin,
+} from "./types.ts";
 import {
   extractPackageNameFromSpecifier,
   isBareModuleSpecifier,
@@ -473,4 +479,5 @@ export async function createModuleGraph(
   return moduleGraph;
 }
 
-export type { Module, Plugin };
+export { ModuleGraph };
+export type { FindImportChainsOptions, Module, Plugin };
