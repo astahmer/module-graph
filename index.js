@@ -1,7 +1,7 @@
-import fs from "fs";
-import path from "path";
-import { pathToFileURL, fileURLToPath } from "url";
-import { builtinModules } from "module";
+import fs from "node:fs";
+import path from "node:path";
+import { pathToFileURL, fileURLToPath } from "node:url";
+import { builtinModules } from "node:module";
 import { createFilter, normalizePath } from '@rollup/pluginutils';
 import { parseSync } from 'oxc-parser';
 import { ResolverFactory } from 'oxc-resolver';
@@ -205,6 +205,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
   }
 
   const importsToScan = new Set([...modules]);
+  const scannedModules = new Set();
 
   let moduleGraph = new ModuleGraph(basePath, entrypoints);
   for (const module of modules) {
@@ -225,6 +226,7 @@ export async function createModuleGraph(entrypoints, options = {}) {
   while (importsToScan.size) {
     for (const dep of importsToScan) {
       importsToScan.delete(dep);
+      scannedModules.add(dep);
       const filename = path.join(basePath, dep);
       let source = fs.readFileSync(filename).toString();
 
@@ -389,13 +391,16 @@ export async function createModuleGraph(entrypoints, options = {}) {
 
         if (
           !isForeignModule(/** @type {string} */(pathToDependency)) &&
-          !moduleGraph.graph.has(pathToDependency)
+          !scannedModules.has(pathToDependency)
         ) {
           importsToScan.add(pathToDependency);
         }
 
         if (!moduleGraph.modules.has(pathToDependency)) {
           moduleGraph.modules.set(pathToDependency, module);
+        }
+        if (!moduleGraph.graph.has(pathToDependency)) {
+          moduleGraph.graph.set(pathToDependency, new Set());
         }
         if (!moduleGraph.graph.has(dep)) {
           moduleGraph.graph.set(dep, new Set());

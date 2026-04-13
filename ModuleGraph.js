@@ -15,12 +15,19 @@ export class ModuleGraph {
    * @param {string | string[]} entrypoints
    */
   constructor(basePath, entrypoints) {
+    const normalizedEntrypoints = (typeof entrypoints === 'string' ? [entrypoints] : entrypoints)
+      .map((entrypoint) => toUnix(path.normalize(entrypoint)));
+
     /**
      * @type {Map<string, Set<string>>}
      */
     this.graph = new Map();
-    this.entrypoints = (typeof entrypoints === 'string' ? [entrypoints] : entrypoints).map(e => path.posix.normalize(e));
-    this.relativeEntrypoints = this.entrypoints.map(e => path.relative(basePath, e));
+    this.entrypoints = normalizedEntrypoints;
+    this.relativeEntrypoints = normalizedEntrypoints.map((entrypoint) => (
+      path.isAbsolute(entrypoint)
+        ? toUnix(path.relative(basePath, entrypoint))
+        : entrypoint
+    ));
     this.basePath = basePath;
     /**
      * @type {Map<string, ExternalModule>}
@@ -74,31 +81,27 @@ export class ModuleGraph {
    * @type {string[][]}
    */
     const chains = [];
-    const seen = new Set();
+    const match = typeof targetModule === 'function' ? targetModule : picomatch(targetModule);
 
     /**
      * @param {string} module
-     * @param {string[]} path
+     * @param {string[]} chain
      * @returns
      */
-    const dfs = (module, path) => {
-      const condition =
-        typeof targetModule === "function"
-          ? targetModule(module)
-          : module === targetModule;
-
-      if (seen.has(module)) return;
-      seen.add(module);
-
-      if (condition) {
-        chains.push(path);
+    const dfs = (module, chain) => {
+      if (match(module)) {
+        chains.push(chain);
         return;
       }
 
       const dependencies = this.graph.get(module);
       if (dependencies) {
         for (const dependency of dependencies) {
-          dfs(dependency, [...path, dependency]);
+          if (chain.includes(dependency)) {
+            continue;
+          }
+
+          dfs(dependency, [...chain, dependency]);
         }
       }
     };

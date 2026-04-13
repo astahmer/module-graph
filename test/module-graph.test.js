@@ -34,6 +34,7 @@ describe('createModuleGraph', () => {
     const moduleGraph = await createModuleGraph('./index.js', { basePath: fixture('graph-simple') });
     assert(moduleGraph.graph.get('index.js').has('bar.js'));
     assert(moduleGraph.graph.get('bar.js').has('baz.js'));
+    assert(moduleGraph.graph.has('baz.js'));
 
     const uniqueModules = moduleGraph.getUniqueModules();
     assert.deepStrictEqual(uniqueModules, ['index.js', 'bar.js', 'baz.js']);
