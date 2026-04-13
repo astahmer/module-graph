@@ -1,0 +1,13 @@
+{
+  "ignorePatterns": [
+    "modviz.json",
+    "dist-types/**",
+    "test/fixtures/**",
+    "*.js",
+    "*.d.ts",
+    "bin/*.js",
+    "bin/*.d.ts",
+    "plugins/*.js",
+    "plugins/*.d.ts"
+  ]
+}

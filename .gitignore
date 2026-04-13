@@ -1,3 +1,14 @@
 /node_modules/
-dist-types/
+/index.js
+/index.d.ts
+/ModuleGraph.js
+/ModuleGraph.d.ts
+/utils.js
+/utils.d.ts
+/types.js
+/types.d.ts
+/bin/index.js
+/bin/index.d.ts
+/plugins/*.js
+/plugins/*.d.ts
 modviz.json

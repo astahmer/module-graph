@@ -1,34 +1,36 @@
-import { ModuleGraph } from './ModuleGraph.js';
-import type { NapiResolveOptions } from 'oxc-resolver';
-import type { URL } from 'node:url';
+import type { URL } from "node:url";
+import type { NapiResolveOptions } from "oxc-resolver";
+import type { ModuleGraph } from "./ModuleGraph.js";
 
 interface UserProvided {
   [key: string]: any;
 }
 
+export type PathMatcherPattern = string | ((importee: string) => boolean);
+
 export interface Module extends UserProvided {
   /** File URL */
-  href: string,
+  href: string;
   /** Absolute path */
-  pathname: string,
+  pathname: string;
   /** Relative path from the cwd */
-  path: string,
-  source: string,
-  packageRoot?: URL,
-  facade: boolean,
-  hasModuleSyntax: boolean,
-  importedBy: string[],
+  path: string;
+  source: string;
+  packageRoot?: URL;
+  facade: boolean;
+  hasModuleSyntax: boolean;
+  importedBy: string[];
 }
 
 export interface ExternalModule extends Module {
   /** The name of the external package, e.g. "foo" */
-  package: string,
+  package: string;
   /** The import thats used in the source code, e.g. "foo/bar.js" */
-  importSpecifier: string,
+  importSpecifier: string;
 }
 
-export type ExtendedModule<T> = Module & T;
-export type ExtendedModuleGraph<T> = ModuleGraph & T;
+export type ExtendedModule<T extends UserProvided> = Module & T;
+export type ExtendedModuleGraph<T extends UserProvided> = ModuleGraph & T;
 
 export interface Plugin {
   name: string;
@@ -37,9 +39,9 @@ export interface Plugin {
    * Use for initializing logic of the plugin
    */
   start?: (params: {
-    entrypoints: string[],
-    basePath: string,
-    exportConditions: string[],
+    entrypoints: string[];
+    basePath: string;
+    exportConditions: string[];
   }) => void | Promise<void>;
   /**
    * Runs for every file, can be used to transform source files,
@@ -48,7 +50,7 @@ export interface Plugin {
    */
   transformSource?: (params: {
     filename: string;
-    source: string
+    source: string;
   }) => void | string | Promise<void | string>;
   /**
    * Runs for every import starting (but excluding) the entrypoints
@@ -57,9 +59,9 @@ export interface Plugin {
    * If a string is returned, it will try to resolve that instead
    */
   handleImport?: (params: {
-    source: string,
-    importer: string,
-    importee: string,
+    source: string;
+    importer: string;
+    importee: string;
   }) => void | boolean | string | Promise<void | boolean | string>;
   /**
    * Runs for every module
@@ -74,11 +76,13 @@ export interface Plugin {
    * If nothing is returned, the default resolution will be used
    * If a URL is returned, it will output that instead
    */
-  resolve?: (params: {
-    importee: string,
-    importer: string,
-    exportConditions: string[],
-  } & NapiResolveOptions) => URL | void | Promise<void | URL>;
+  resolve?: (
+    params: {
+      importee: string;
+      importer: string;
+      exportConditions: string[];
+    } & NapiResolveOptions,
+  ) => URL | string | void | Promise<void | URL | string>;
   /**
    * Runs once
    * Use for cleanup logic of the plugin
@@ -87,17 +91,17 @@ export interface Plugin {
 }
 
 export interface CreateModuleGraphOptions extends NapiResolveOptions {
-  plugins?: Plugin[]
-  basePath?: string
+  plugins?: Plugin[];
+  basePath?: string;
   external?: {
-    ignore?: boolean
-    include?: string[]
-    exclude?: string[]
-  }
-  exportConditions?: NapiResolveOptions['conditionNames']
-  includeTypeOnlyImports?: boolean
-  ignoreDynamicImport?: boolean
-  exclude?: Array<string | ((importee: string) => boolean)>
-  foreignModules?: Array<string | ((importee: string) => boolean)>
-  virtualModules?: Array<string | ((importee: string) => boolean)>
+    ignore?: boolean;
+    include?: string[];
+    exclude?: string[];
+  };
+  exportConditions?: NapiResolveOptions["conditionNames"];
+  includeTypeOnlyImports?: boolean;
+  ignoreDynamicImport?: boolean;
+  exclude?: PathMatcherPattern[];
+  foreignModules?: PathMatcherPattern[];
+  virtualModules?: PathMatcherPattern[];
 }

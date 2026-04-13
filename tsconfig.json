@@ -1,21 +1,15 @@
 {
   "compilerOptions": {
-    "target": "esnext",
+    "target": "ES2022",
     "module": "NodeNext",
-    "moduleResolution": "node16",
-    "allowJs": true,
-    "checkJs": true,
-    "declaration": true,
-    "emitDeclarationOnly": true,
-    "outDir": "./dist-types",
+    "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
     "strict": true,
     "noImplicitThis": true,
     "alwaysStrict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["node"],
+    "noEmit": true
   },
-  "include": [
-    "*.js",
-    "plugins/*.js",
-    "types.ts"
-  ],
+  "include": ["*.ts", "bin/*.ts", "plugins/*.ts", "test/module-graph.test.ts"]
 }

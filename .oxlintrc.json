@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["import", "typescript"],
+  "env": {
+    "node": true
+  },
+  "ignorePatterns": [
+    "modviz.json",
+    "dist-types/**",
+    "test/fixtures/**",
+    "*.js",
+    "*.d.ts",
+    "bin/*.js",
+    "bin/*.d.ts",
+    "plugins/*.js",
+    "plugins/*.d.ts"
+  ]
+}
