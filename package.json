@@ -1,7 +1,7 @@
 {
   "name": "@astahmer/module-graph",
   "type": "module",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": "Creates a module graph based on a given entrypoint.",
   "keywords": [
     "module",
