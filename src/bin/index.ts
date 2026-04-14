@@ -5,21 +5,6 @@ import { pathToFileURL } from "node:url";
 import { program } from "commander";
 import { createModuleGraph } from "../index.ts";
 
-function ensureRelative(filePath: string): string {
-  if (!filePath.startsWith("./") && !filePath.startsWith("../")) {
-    return `./${filePath}`;
-  }
-
-  return filePath;
-}
-
-function parseEntrypoints(entrypoint: string): string[] {
-  return entrypoint
-    .split(",")
-    .map((value) => value.trim())
-    .map(ensureRelative);
-}
-
 export function readPackageVersion(moduleUrl: string | URL = import.meta.url): string {
   for (const candidate of ["../package.json", "../../package.json"]) {
     try {
@@ -51,7 +36,7 @@ program
   .argument("<pattern>", "Module to find")
   .description("Output the import chain for a given module")
   .action(async (entrypoint: string, pattern: string) => {
-    const graph = await createModuleGraph(parseEntrypoints(entrypoint));
+    const graph = await createModuleGraph(entrypoint);
 
     for (const module of graph.get(pattern)) {
       console.log(module);
@@ -63,7 +48,7 @@ program
   .argument("<pattern>", "Module to find import chain for")
   .description("Output the import chain for a given module")
   .action(async (entrypoint: string, pattern: string) => {
-    const graph = await createModuleGraph(parseEntrypoints(entrypoint));
+    const graph = await createModuleGraph(entrypoint);
 
     let index = 0;
     for (const chain of graph.findImportChains(pattern)) {
@@ -76,7 +61,7 @@ program
   });
 
 program.argument("<entrypoint>", "Entrypoint").action(async (entrypoint: string) => {
-  const graph = await createModuleGraph(parseEntrypoints(entrypoint));
+  const graph = await createModuleGraph(entrypoint);
 
   for (const module of graph.getUniqueModules()) {
     console.log(module);
