@@ -39,6 +39,21 @@ const DEFAULT_EXTENSION_ALIAS: Record<string, string[]> = {
   ".cjs": [".cjs", ".cts"],
 };
 
+const getParserLang = (filename: string): "js" | "jsx" | "ts" | "tsx" => {
+  switch (path.extname(filename).toLowerCase()) {
+    case ".jsx":
+      return "jsx";
+    case ".tsx":
+      return "tsx";
+    case ".ts":
+    case ".mts":
+    case ".cts":
+      return "ts";
+    default:
+      return "js";
+  }
+};
+
 interface ImportRecord {
   n: string;
   ss: number;
@@ -140,7 +155,7 @@ export async function createModuleGraph(
   };
 
   const getModuleInfo = (filename: string, source: string): ModuleInfo => {
-    const result = parseSync(filename, source);
+    const result = parseSync(filename, source, { lang: getParserLang(filename) });
     if (result.errors.length > 0) {
       throw new Error(result.errors.map((error) => error.message).join("\n"));
     }

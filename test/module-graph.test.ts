@@ -240,6 +240,15 @@ describe("createModuleGraph", () => {
     assert.equal(moduleGraph.modules.get("styles.css")?.hasModuleSyntax, false);
   });
 
+  it("tsx", async () => {
+    const moduleGraph = await createModuleGraph("./index.tsx", {
+      basePath: fixture("tsx"),
+    });
+
+    assert(moduleGraph.graph.get("index.tsx")?.has("foo.ts"));
+    assert.equal(moduleGraph.modules.get("index.tsx")?.hasModuleSyntax, true);
+  });
+
   it("virtual-modules", async () => {
     const moduleGraph = await createModuleGraph("./index.js", {
       basePath: fixture("virtual-modules"),
