@@ -96,6 +96,7 @@ export async function createModuleGraph(
     exportConditions = ["node", "import"],
     includeTypeOnlyImports = false,
     ignoreDynamicImport = false,
+    verbose = false,
     external = {
       ignore: false,
       include: [],
@@ -135,6 +136,13 @@ export async function createModuleGraph(
     return toUnix(path.relative(basePath, absoluteEntrypoint));
   };
   const modules = processedEntrypoints.map(toRelative);
+  let scannedModuleCount = 0;
+
+  const logVerbose = (message: string) => {
+    if (verbose) {
+      console.info(message);
+    }
+  };
 
   const getLiteralImportSpecifier = (request: string): string | undefined => {
     const quote = request.at(0);
@@ -157,7 +165,8 @@ export async function createModuleGraph(
   const getModuleInfo = (filename: string, source: string): ModuleInfo => {
     const result = parseSync(filename, source, { lang: getParserLang(filename) });
     if (result.errors.length > 0) {
-      throw new Error(result.errors.map((error) => error.message).join("\n"));
+      const errorMessage = result.errors.map((error) => error.message).join("\n");
+      throw new Error(`[PARSE] Failed to parse ${toUnix(path.relative(basePath, filename))}\n\n${errorMessage}`);
     }
 
     const imports: ImportRecord[] = [];
@@ -254,6 +263,11 @@ export async function createModuleGraph(
     for (const dep of [...importsToScan]) {
       importsToScan.delete(dep);
       scannedModules.add(dep);
+      scannedModuleCount += 1;
+
+      if (verbose && (scannedModuleCount === 1 || scannedModuleCount % 250 === 0)) {
+        logVerbose(`[modgraph] scanned ${scannedModuleCount} modules, current: ${dep}`);
+      }
 
       const filename = path.join(basePath, dep);
       let source = fs.readFileSync(filename, "utf8");

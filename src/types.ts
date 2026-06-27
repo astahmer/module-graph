@@ -97,6 +97,7 @@ export interface Plugin {
 export interface CreateModuleGraphOptions extends NapiResolveOptions {
   plugins?: Plugin[];
   basePath?: string;
+  verbose?: boolean;
   external?: {
     ignore?: boolean;
     include?: string[];

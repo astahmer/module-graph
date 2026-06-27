@@ -240,6 +240,15 @@ describe("createModuleGraph", () => {
     assert.equal(moduleGraph.modules.get("styles.css")?.hasModuleSyntax, false);
   });
 
+  it("includes the file path in parse errors", async () => {
+    await assert.rejects(
+      createModuleGraph("./index.ts", {
+        basePath: fixture("parse-error"),
+      }),
+      /Failed to parse .*index\.ts/,
+    );
+  });
+
   it("tsx", async () => {
     const moduleGraph = await createModuleGraph("./index.tsx", {
       basePath: fixture("tsx"),
